@@ -6,6 +6,9 @@ A VSCode extension that fuzzy-matches user queries against string literals in so
 
 ## Key Conventions
 
+### Shell
+- **PowerShell** is the default shell on this Windows machine. All shell commands should use PowerShell syntax.
+
 ### Package Manager
 - **Always use `bun`** — never `npm`, `npx`, `yarn`, or `pnpm`.
 - Use `bun add` to install packages, `bun run` to run scripts.

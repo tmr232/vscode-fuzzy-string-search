@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+
+# Extension package
+*.vsix
+
+# WASM files (downloaded at build time)
+wasm/*.wasm
+
+# Test coverage
+coverage/
+*.lcov
+
+# Logs
+*.log
+
+# dotenv
+.env
+.env.local
+.env.*.local
+
+# Caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+
+# VSCode test runner
+.vscode-test/

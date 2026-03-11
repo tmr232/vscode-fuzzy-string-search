@@ -1,0 +1,15 @@
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+scripts/**
+docs/**
+node_modules/**
+.gitignore
+.pre-commit-config.yaml
+tsconfig.json
+vitest.config.ts
+biome.json
+*.md
+!README.md
+!CHANGELOG.md

@@ -6,15 +6,15 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 1: Project Scaffolding
 
-- [ ] **1.1** Initialize project with `bun init`, configure `package.json` with VSCode extension fields (`engines.vscode`, `activationEvents`, `contributes`, `main: ./out/extension.js`)
-- [ ] **1.2** Install and configure TypeScript (`tsconfig.json`: strict, ES2022, NodeNext, outDir `./out`, rootDir `./src`)
-- [ ] **1.3** Set up esbuild for extension bundling (Node target, `vscode` as external)
-- [ ] **1.4** Install and configure vitest (`vitest.config.ts`, `test` script in `package.json`)
-- [ ] **1.5** Install and configure biome.js (`biome.json`) and oxlint for linting/formatting
-- [ ] **1.6** Create `.gitignore` (node_modules, out, .vscode-test, wasm/*.wasm)
-- [ ] **1.7** Create `.vscodeignore` to exclude dev files from packaged extension
-- [ ] **1.8** Create initial `src/extension.ts` with empty `activate`/`deactivate`
-- [ ] **1.9** Create directory structure:
+- [x] **1.1** Initialize project with `bun init`, configure `package.json` with VSCode extension fields (`engines.vscode`, `activationEvents`, `contributes`, `main: ./out/extension.js`)
+- [x] **1.2** Install and configure TypeScript (`tsconfig.json`: strict, ES2022, NodeNext, outDir `./out`, rootDir `./src`)
+- [x] **1.3** Set up esbuild for extension bundling (Node target, `vscode` as external)
+- [x] **1.4** Install and configure vitest (`vitest.config.ts`, `test` script in `package.json`)
+- [x] **1.5** Install and configure biome.js (`biome.json`) and oxlint for linting/formatting
+- [x] **1.6** Create `.gitignore` (node_modules, out, .vscode-test, wasm/*.wasm)
+- [x] **1.7** Create `.vscodeignore` to exclude dev files from packaged extension
+- [x] **1.8** Create initial `src/extension.ts` with empty `activate`/`deactivate`
+- [x] **1.9** Create directory structure:
   - `src/languages/` — language support modules
   - `src/parsing/` — tree-sitter parsing logic
   - `src/matching/` — fuzzy matching logic
@@ -25,7 +25,7 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
   - `scripts/` — automation scripts
   - `wasm/` — bundled .wasm files
   - `docs/adr/` — architecture decision records
-- [ ] **1.10** Create `README.md` and `CHANGELOG.md`
+- [x] **1.10** Create `README.md` and `CHANGELOG.md`
 
 ## Phase 2: Pre-commit & CI
 
