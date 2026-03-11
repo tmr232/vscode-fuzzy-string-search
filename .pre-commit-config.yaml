@@ -1,0 +1,30 @@
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  # Biome - formatting and linting (uses local install)
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: biome check
+        entry: bun run biome check --write --files-ignore-unknown=true --no-errors-on-unmatched
+        language: system
+        types: [text]
+        files: '\.(jsx?|tsx?|c(js|ts)|m(js|ts)|d\.(ts|cts|mts)|jsonc?)$'
+
+  # Ad-blocker - block LLM co-author trailers
+  - repo: https://github.com/tmr232/precommit-ad-blocker
+    rev: v1.0.0
+    hooks:
+      - id: ad-blocker
+
+  # Zizmor - GitHub Actions security linting
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.23.1
+    hooks:
+      - id: zizmor
+
+  # Ratchet - pin GitHub Actions versions
+  - repo: https://github.com/tmr232/ratchet-pre-commit
+    rev: v0.11.4
+    hooks:
+      - id: ratchet-pin

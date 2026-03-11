@@ -29,19 +29,19 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 2: Pre-commit & CI
 
-- [ ] **2.1** Create `.pre-commit-config.yaml` with:
+- [x] **2.1** Create `.pre-commit-config.yaml` with:
   - biome (formatting + linting)
   - `https://github.com/tmr232/precommit-ad-blocker/` (default config)
   - `https://github.com/zizmorcore/zizmor-pre-commit` (GitHub Actions security)
   - `https://github.com/tmr232/ratchet-pre-commit` (pin GitHub Actions versions)
-- [ ] **2.2** Run `prek install` to activate hooks
-- [ ] **2.3** Create GitHub Actions workflow: **build & test** (on push/PR)
+- [x] **2.2** Run `prek install` to activate hooks
+- [x] **2.3** Create GitHub Actions workflow: **build & test** (on push/PR)
   - Checkout, install bun, install deps, lint, build, test
-- [ ] **2.4** Create GitHub Actions workflow: **publish** (on release tag)
+- [x] **2.4** Create GitHub Actions workflow: **publish** (on release tag)
   - Build, package with `vsce`
   - Publish to VSCode Marketplace
   - Publish to Open VSX Registry
-- [ ] **2.5** Pin all GitHub Actions versions using ratchet
+- [x] **2.5** Pin all GitHub Actions versions using ratchet
 
 ## Phase 3: Tree-Sitter Integration
 
