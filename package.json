@@ -19,6 +19,7 @@
 		"watch": "bun run build --watch",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"download-wasm": "bun run scripts/download-wasm.ts",
 		"lint": "biome check . && oxlint",
 		"lint:fix": "biome check --fix .",
 		"format": "biome format --write ."
@@ -32,5 +33,9 @@
 		"oxlint": "^1.53.0",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.18"
+	},
+	"dependencies": {
+		"tree-sitter-python": "^0.25.0",
+		"web-tree-sitter": "^0.26.6"
 	}
 }

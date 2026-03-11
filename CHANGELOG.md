@@ -10,3 +10,8 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Add GitHub Actions publish workflow (VSCode Marketplace + Open VSX on tag)
 - Pin all GitHub Actions versions with ratchet
 - Add `@vscode/vsce` and `ovsx` as dev dependencies
+- Add tree-sitter integration via `web-tree-sitter` (WASM-based)
+- Add `tree-sitter-python` grammar as a dependency
+- Create `scripts/download-wasm.ts` to copy language WASM files into `wasm/`
+- Create `src/parsing/parser-manager.ts` for tree-sitter initialization, language loading, and parser creation
+- Add ADR-001: Use web-tree-sitter (WASM) over native node bindings

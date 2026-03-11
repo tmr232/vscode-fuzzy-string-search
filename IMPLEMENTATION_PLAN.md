@@ -45,18 +45,19 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 3: Tree-Sitter Integration
 
-- [ ] **3.1** Install `web-tree-sitter` (`bun add web-tree-sitter`)
-- [ ] **3.2** Create `scripts/download-wasm.ts` to download language `.wasm` files from GitHub releases
-  - Accept language name as argument, map to GitHub repo URL
+- [x] **3.1** Install `web-tree-sitter` (`bun add web-tree-sitter`)
+- [x] **3.2** Create `scripts/download-wasm.ts` to download language `.wasm` files from npm packages
+  - Accept language name as argument, map to npm package
+  - Also copies `web-tree-sitter.wasm` runtime
   - Save to `wasm/` directory
   - Start with `tree-sitter-python`
   - Add `download-wasm` script to `package.json`
-- [ ] **3.3** Run the download script to fetch `tree-sitter-python.wasm`
-- [ ] **3.4** Create `src/parsing/parser-manager.ts`:
+- [x] **3.3** Run the download script to fetch `tree-sitter-python.wasm`
+- [x] **3.4** Create `src/parsing/parser-manager.ts`:
   - `Parser.init()` at extension activation
-  - Load `.wasm` files from `context.extensionUri`
-  - Cache initialized `Language` objects per language ID
-- [ ] **3.5** Write ADR-001: Use web-tree-sitter (WASM) over native node bindings
+  - Load `.wasm` files from configurable directory
+  - Cache initialized `Language` objects per wasm path
+- [x] **3.5** Write ADR-001: Use web-tree-sitter (WASM) over native node bindings
 
 ## Phase 4: Language Support Architecture
 
