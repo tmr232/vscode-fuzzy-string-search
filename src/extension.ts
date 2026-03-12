@@ -1,10 +1,17 @@
 import * as vscode from "vscode";
 import { StringCache } from "./cache/string-cache.js";
 import { getAllLanguages } from "./languages/registry.js";
+import { SearchPanelProvider, VIEW_ID } from "./views/search-panel.js";
 
 export const stringCache = new StringCache();
 
 export function activate(context: vscode.ExtensionContext): void {
+	// Register the search panel webview
+	const searchPanelProvider = new SearchPanelProvider(context.extensionUri, stringCache);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(VIEW_ID, searchPanelProvider),
+	);
+
 	// Invalidate cache when a document is saved (covers both internal edits and external tools that trigger a save)
 	context.subscriptions.push(
 		vscode.workspace.onDidSaveTextDocument((document) => {

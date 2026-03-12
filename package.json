@@ -13,7 +13,44 @@
 	],
 	"activationEvents": [],
 	"main": "./out/extension.js",
-	"contributes": {},
+	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "fuzzy-string-grep",
+					"title": "Fuzzy String Grep",
+					"icon": "$(search)"
+				}
+			]
+		},
+		"views": {
+			"fuzzy-string-grep": [
+				{
+					"type": "webview",
+					"id": "fuzzyStringGrep.searchPanel",
+					"name": "Search"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Fuzzy String Grep",
+			"properties": {
+				"fuzzyStringGrep.defaultScoreCutoff": {
+					"type": "number",
+					"default": 60,
+					"minimum": 0,
+					"maximum": 100,
+					"description": "Minimum fuzzy match score (0–100) to include in results."
+				},
+				"fuzzyStringGrep.maxResults": {
+					"type": "number",
+					"default": 100,
+					"minimum": 0,
+					"description": "Maximum number of results to return (0 for unlimited)."
+				}
+			}
+		}
+	},
 	"scripts": {
 		"build": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
 		"watch": "bun run build --watch",

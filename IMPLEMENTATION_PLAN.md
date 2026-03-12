@@ -158,18 +158,18 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 9: VSCode Side Panel UI
 
-- [ ] **9.1** Register a `ViewContainer` in `package.json` (`contributes.viewsContainers.activitybar`)
-- [ ] **9.2** Register a `TreeView` or `WebviewView` in the container
-- [ ] **9.3** Create `src/views/search-panel.ts`:
+- [x] **9.1** Register a `ViewContainer` in `package.json` (`contributes.viewsContainers.activitybar`)
+- [x] **9.2** Register a `TreeView` or `WebviewView` in the container
+- [x] **9.3** Create `src/views/search-panel.ts`:
   - Input fields: query text, score cutoff (number), files to include (glob), files to exclude (glob)
   - Results list: file path, line number, matched string content, score
   - Clicking a result opens the file at the matched location
-- [ ] **9.4** Wire the panel to the search engine:
+- [x] **9.4** Wire the panel to the search engine:
   - On input change (debounced), trigger search
   - Show results as they arrive (streaming)
   - Show a progress indicator during search
   - Allow cancellation (user types new query → cancel previous search)
-- [ ] **9.5** Add configuration settings in `package.json` (`contributes.configuration`):
+- [x] **9.5** Add configuration settings in `package.json` (`contributes.configuration`):
   - `fuzzyStringGrep.defaultScoreCutoff` (default: 60)
   - `fuzzyStringGrep.maxResults` (default: 100)
 

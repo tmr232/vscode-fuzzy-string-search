@@ -1,0 +1,356 @@
+import { join, relative } from "node:path";
+import * as vscode from "vscode";
+import type { StringCache } from "../cache/string-cache.js";
+import type { MatchResult } from "../matching/fuzzy-matcher.js";
+import { search } from "../search/search-engine.js";
+
+export const VIEW_ID = "fuzzyStringGrep.searchPanel";
+
+interface SearchMessage {
+	type: "search";
+	query: string;
+	scoreCutoff: number;
+	includeGlob: string;
+	excludeGlob: string;
+}
+
+interface OpenFileMessage {
+	type: "openFile";
+	filePath: string;
+	startLine: number;
+	startColumn: number;
+	endLine: number;
+	endColumn: number;
+}
+
+type IncomingMessage = SearchMessage | OpenFileMessage;
+
+export class SearchPanelProvider implements vscode.WebviewViewProvider {
+	private view?: vscode.WebviewView;
+	private searchCts?: vscode.CancellationTokenSource;
+
+	constructor(
+		private readonly extensionUri: vscode.Uri,
+		private readonly cache: StringCache,
+	) {}
+
+	resolveWebviewView(
+		webviewView: vscode.WebviewView,
+		_context: vscode.WebviewViewResolveContext,
+		_token: vscode.CancellationToken,
+	): void {
+		this.view = webviewView;
+
+		webviewView.webview.options = {
+			enableScripts: true,
+		};
+
+		const config = vscode.workspace.getConfiguration("fuzzyStringGrep");
+		const defaultCutoff = config.get<number>("defaultScoreCutoff", 60);
+		const maxResults = config.get<number>("maxResults", 100);
+
+		webviewView.webview.html = getWebviewHtml(defaultCutoff);
+
+		webviewView.webview.onDidReceiveMessage((message: IncomingMessage) => {
+			if (message.type === "search") {
+				this.handleSearch(message, maxResults);
+			} else if (message.type === "openFile") {
+				this.handleOpenFile(message);
+			}
+		});
+	}
+
+	private handleSearch(message: SearchMessage, maxResults: number): void {
+		// Cancel any in-flight search
+		if (this.searchCts) {
+			this.searchCts.cancel();
+			this.searchCts.dispose();
+		}
+		this.searchCts = new vscode.CancellationTokenSource();
+		const token = this.searchCts.token;
+
+		const query = message.query.trim();
+		if (query === "") {
+			this.postMessage({ type: "results", results: [], done: true });
+			return;
+		}
+
+		this.postMessage({ type: "searching" });
+
+		const wasmDir = join(this.extensionUri.fsPath, "wasm");
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		const workspaceRoot = workspaceFolders?.[0]?.uri.fsPath;
+
+		search(query, this.cache, wasmDir, {
+			scoreCutoff: message.scoreCutoff,
+			maxResults,
+			includeGlob: message.includeGlob || undefined,
+			excludeGlob: message.excludeGlob || undefined,
+			token,
+			onFileResults: (fileResults) => {
+				if (token.isCancellationRequested) return;
+				this.postMessage({
+					type: "results",
+					results: formatResults(fileResults, workspaceRoot),
+					done: false,
+				});
+			},
+		})
+			.then((allResults) => {
+				if (token.isCancellationRequested) return;
+				this.postMessage({
+					type: "results",
+					results: formatResults(allResults, workspaceRoot),
+					done: true,
+				});
+			})
+			.catch((err: unknown) => {
+				if (token.isCancellationRequested) return;
+				const errorMessage = err instanceof Error ? err.message : String(err);
+				this.postMessage({ type: "error", message: errorMessage });
+			});
+	}
+
+	private handleOpenFile(message: OpenFileMessage): void {
+		const uri = vscode.Uri.file(message.filePath);
+		const range = new vscode.Range(
+			message.startLine,
+			message.startColumn,
+			message.endLine,
+			message.endColumn,
+		);
+		vscode.window.showTextDocument(uri, {
+			selection: range,
+			preserveFocus: false,
+		});
+	}
+
+	private postMessage(message: unknown): void {
+		this.view?.webview.postMessage(message);
+	}
+}
+
+interface FormattedResult {
+	filePath: string;
+	relativePath: string;
+	content: string;
+	score: number;
+	startLine: number;
+	startColumn: number;
+	endLine: number;
+	endColumn: number;
+}
+
+function formatResults(
+	results: MatchResult[],
+	workspaceRoot: string | undefined,
+): FormattedResult[] {
+	return results.map((r) => ({
+		filePath: r.sourceString.filePath,
+		relativePath: workspaceRoot
+			? relative(workspaceRoot, r.sourceString.filePath)
+			: r.sourceString.filePath,
+		content: r.sourceString.content,
+		score: r.score,
+		startLine: r.sourceString.startLine,
+		startColumn: r.sourceString.startColumn,
+		endLine: r.sourceString.endLine,
+		endColumn: r.sourceString.endColumn,
+	}));
+}
+
+function getWebviewHtml(defaultCutoff: number): string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	body {
+		font-family: var(--vscode-font-family);
+		font-size: var(--vscode-font-size);
+		color: var(--vscode-foreground);
+		padding: 8px;
+	}
+	.input-group { margin-bottom: 6px; }
+	.input-group label {
+		display: block;
+		font-size: 11px;
+		text-transform: uppercase;
+		color: var(--vscode-descriptionForeground);
+		margin-bottom: 2px;
+	}
+	input[type="text"], input[type="number"] {
+		width: 100%;
+		padding: 4px 6px;
+		border: 1px solid var(--vscode-input-border);
+		background: var(--vscode-input-background);
+		color: var(--vscode-input-foreground);
+		font-family: var(--vscode-font-family);
+		font-size: var(--vscode-font-size);
+		outline: none;
+	}
+	input:focus {
+		border-color: var(--vscode-focusBorder);
+	}
+	.toggle-link {
+		font-size: 11px;
+		color: var(--vscode-textLink-foreground);
+		cursor: pointer;
+		margin-bottom: 6px;
+		display: inline-block;
+	}
+	.toggle-link:hover {
+		color: var(--vscode-textLink-activeForeground);
+	}
+	.advanced { display: none; }
+	.advanced.visible { display: block; }
+	.status {
+		font-size: 11px;
+		color: var(--vscode-descriptionForeground);
+		margin: 6px 0;
+	}
+	.results { margin-top: 4px; }
+	.result-item {
+		padding: 4px 6px;
+		cursor: pointer;
+		border-bottom: 1px solid var(--vscode-panel-border);
+	}
+	.result-item:hover {
+		background: var(--vscode-list-hoverBackground);
+	}
+	.result-file {
+		font-size: 11px;
+		color: var(--vscode-descriptionForeground);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.result-content {
+		font-family: var(--vscode-editor-font-family);
+		font-size: var(--vscode-editor-font-size);
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	.result-score {
+		font-size: 11px;
+		color: var(--vscode-descriptionForeground);
+		float: right;
+	}
+</style>
+</head>
+<body>
+	<div class="input-group">
+		<input type="text" id="query" placeholder="Search strings…" />
+	</div>
+	<span class="toggle-link" id="toggleAdvanced">⋯ filters</span>
+	<div class="advanced" id="advancedSection">
+		<div class="input-group">
+			<label>Score cutoff</label>
+			<input type="number" id="scoreCutoff" value="${defaultCutoff}" min="0" max="100" />
+		</div>
+		<div class="input-group">
+			<label>Files to include</label>
+			<input type="text" id="includeGlob" placeholder="e.g. **/*.py" />
+		</div>
+		<div class="input-group">
+			<label>Files to exclude</label>
+			<input type="text" id="excludeGlob" placeholder="e.g. **/tests/**" />
+		</div>
+	</div>
+	<div class="status" id="status"></div>
+	<div class="results" id="results"></div>
+
+<script>
+	const vscode = acquireVsCodeApi();
+	const queryInput = document.getElementById('query');
+	const scoreCutoffInput = document.getElementById('scoreCutoff');
+	const includeGlobInput = document.getElementById('includeGlob');
+	const excludeGlobInput = document.getElementById('excludeGlob');
+	const statusEl = document.getElementById('status');
+	const resultsEl = document.getElementById('results');
+	const toggleAdvanced = document.getElementById('toggleAdvanced');
+	const advancedSection = document.getElementById('advancedSection');
+
+	let debounceTimer = null;
+	const DEBOUNCE_MS = 300;
+
+	toggleAdvanced.addEventListener('click', () => {
+		advancedSection.classList.toggle('visible');
+		toggleAdvanced.textContent = advancedSection.classList.contains('visible')
+			? '⋯ hide filters'
+			: '⋯ filters';
+	});
+
+	function triggerSearch() {
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			vscode.postMessage({
+				type: 'search',
+				query: queryInput.value,
+				scoreCutoff: parseInt(scoreCutoffInput.value, 10) || 60,
+				includeGlob: includeGlobInput.value,
+				excludeGlob: excludeGlobInput.value,
+			});
+		}, DEBOUNCE_MS);
+	}
+
+	queryInput.addEventListener('input', triggerSearch);
+	scoreCutoffInput.addEventListener('change', triggerSearch);
+	includeGlobInput.addEventListener('input', triggerSearch);
+	excludeGlobInput.addEventListener('input', triggerSearch);
+
+	function escapeHtml(text) {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+
+	function renderResults(results) {
+		resultsEl.innerHTML = '';
+		if (results.length === 0) {
+			statusEl.textContent = 'No results';
+			return;
+		}
+		statusEl.textContent = results.length + ' result' + (results.length === 1 ? '' : 's');
+		for (const r of results) {
+			const item = document.createElement('div');
+			item.className = 'result-item';
+			item.innerHTML =
+				'<div class="result-file">' +
+					'<span class="result-score">' + r.score + '</span>' +
+					escapeHtml(r.relativePath) + ':' + (r.startLine + 1) +
+				'</div>' +
+				'<div class="result-content">' + escapeHtml(r.content) + '</div>';
+			item.addEventListener('click', () => {
+				vscode.postMessage({
+					type: 'openFile',
+					filePath: r.filePath,
+					startLine: r.startLine,
+					startColumn: r.startColumn,
+					endLine: r.endLine,
+					endColumn: r.endColumn,
+				});
+			});
+			resultsEl.appendChild(item);
+		}
+	}
+
+	window.addEventListener('message', (event) => {
+		const message = event.data;
+		if (message.type === 'searching') {
+			statusEl.textContent = 'Searching…';
+		} else if (message.type === 'results') {
+			if (message.done) {
+				renderResults(message.results);
+			}
+		} else if (message.type === 'error') {
+			statusEl.textContent = 'Error: ' + message.message;
+			resultsEl.innerHTML = '';
+		}
+	});
+</script>
+</body>
+</html>`;
+}

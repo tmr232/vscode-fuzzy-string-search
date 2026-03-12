@@ -34,3 +34,13 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
   - Incremental results via `onFileResults` callback
   - Configurable score cutoff, max results, and include/exclude globs
 - Add integration tests for search engine (`test/search/search-engine.test.ts`)
+- Add side panel UI with WebviewViewProvider (`src/views/search-panel.ts`)
+  - Search input with debounced query (300ms)
+  - Collapsible filter section: score cutoff, include glob, exclude glob
+  - Results display with relative file path, line number, matched string content, and score
+  - Click-to-open: clicking a result opens the file at the matched location
+  - In-flight search cancellation when query changes
+  - Streaming results via `onFileResults` callback
+- Register activity bar view container and webview view in `package.json`
+- Add configuration settings: `fuzzyStringGrep.defaultScoreCutoff` (default: 60), `fuzzyStringGrep.maxResults` (default: 100)
+- Wire search panel provider into `extension.ts` activation
