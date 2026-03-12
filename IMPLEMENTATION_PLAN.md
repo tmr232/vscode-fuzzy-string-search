@@ -128,16 +128,17 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 7: File Discovery & Caching
 
-- [ ] **7.1** Create `src/files/file-discovery.ts`:
+- [x] **7.1** Create `src/files/file-discovery.ts`:
   - Use `workspace.findFiles(includePattern, excludePattern)`
   - `.gitignore` respected by default (VSCode API does this)
   - Filter by supported languages via registry
-- [ ] **7.2** Create `src/cache/string-cache.ts`:
+- [x] **7.2** Create `src/cache/string-cache.ts`:
   - In-memory `Map<string, SourceString[]>` keyed by file URI
   - `get(uri)` / `set(uri, strings)` / `invalidate(uri)` / `clear()`
-- [ ] **7.3** Wire up cache invalidation:
-  - Listen to `workspace.onDidChangeTextDocument` → invalidate cache for that file
+- [x] **7.3** Wire up cache invalidation:
+  - Listen to `workspace.onDidSaveTextDocument` → invalidate cache for that file
   - Listen to `workspace.onDidDeleteFiles` → remove from cache
+  - `FileSystemWatcher` for external changes (e.g. git checkout, other editors)
 
 ## Phase 8: Search Engine (Orchestration)
 

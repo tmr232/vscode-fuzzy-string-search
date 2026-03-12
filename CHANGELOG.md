@@ -25,3 +25,6 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Create `src/matching/fuzzy-matcher.ts` — wraps fuzzball's `partial_ratio` scorer with configurable cutoff and limit
 - Add tests for fuzzy matching (`test/matching/fuzzy-matcher.test.ts`)
 - Add ADR-003: Choice of partial_ratio scorer and fuzzball library
+- Create `src/files/file-discovery.ts` — workspace file discovery filtered by supported language extensions
+- Create `src/cache/string-cache.ts` — in-memory per-file cache for parsed source strings
+- Wire up cache invalidation in `extension.ts` via `onDidSaveTextDocument`, `onDidDeleteFiles`, and `FileSystemWatcher` (covers external edits)
