@@ -61,7 +61,7 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 4: Language Support Architecture
 
-- [ ] **4.1** Define `LanguageSupport` interface in `src/languages/language-support.ts`:
+- [x] **4.1** Define `LanguageSupport` interface in `src/languages/language-support.ts`:
   ```typescript
   interface LanguageSupport {
     languageId: string;
@@ -70,21 +70,21 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
     wasmFileName: string;
     stringNodeTypes: string[];
     concatenatedStringNodeTypes: string[];
-    extractStringContent(node: Node, source: string): string;
-    extractConcatenatedString(node: Node, source: string): string;
+    extractStringContent(node: Node): string;
+    extractConcatenatedString(node: Node): string;
   }
   ```
-- [ ] **4.2** Create language registry in `src/languages/registry.ts`:
+- [x] **4.2** Create language registry in `src/languages/registry.ts`:
   - Register `LanguageSupport` implementations
   - Lookup by file extension or VSCode language ID
   - `getLanguageForFile(filename: string): LanguageSupport | undefined`
-- [ ] **4.3** Implement Python support in `src/languages/python.ts`:
+- [x] **4.3** Implement Python support in `src/languages/python.ts`:
   - String node types: `string`, `concatenated_string`
   - Handle: single/double/triple quotes, f-strings (interpolation → `{}`), raw strings, byte strings
   - Concatenated strings: recursively extract and join child strings
   - Skip `comment` nodes
-- [ ] **4.4** Register Python in the registry
-- [ ] **4.5** Write ADR-002: Language support plugin architecture
+- [x] **4.4** Register Python in the registry
+- [x] **4.5** Write ADR-002: Language support plugin architecture
 
 ## Phase 5: String Collection
 
