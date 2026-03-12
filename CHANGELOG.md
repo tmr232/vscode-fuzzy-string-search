@@ -19,3 +19,5 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Create language registry with lookup by file extension, VSCode language ID, or language ID
 - Implement Python language support (string extraction for all quote styles, f-strings, raw/byte strings, concatenated strings)
 - Add ADR-002: Language support plugin architecture
+- Create `src/parsing/string-collector.ts` — TreeCursor-based AST visitor that collects string literals via the LanguageSupport interface
+- Add tests for string collection (`test/parsing/string-collector.test.ts`) and Python string extraction (`test/parsing/python-strings.test.ts`)

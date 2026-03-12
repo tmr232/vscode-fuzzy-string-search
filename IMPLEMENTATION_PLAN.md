@@ -88,7 +88,7 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 5: String Collection
 
-- [ ] **5.1** Define `SourceString` type in `src/types.ts`:
+- [x] **5.1** Define `SourceString` type in `src/types.ts`:
   ```typescript
   interface SourceString {
     content: string;
@@ -99,14 +99,14 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
     endColumn: number;
   }
   ```
-- [ ] **5.2** Create `src/parsing/string-collector.ts`:
+- [x] **5.2** Create `src/parsing/string-collector.ts`:
   - Use `TreeCursor` for efficient tree traversal (visitor pattern, matching source-strings approach)
   - Walk tree, collect string nodes via `LanguageSupport` interface
   - Return `SourceString[]`
-- [ ] **5.3** Write tests: `test/parsing/string-collector.test.ts`
+- [x] **5.3** Write tests: `test/parsing/string-collector.test.ts`
   - Fixture: `test/fixtures/sample.py` with varied string types
   - Test simple strings, triple-quoted, concatenated, f-strings, nested strings
-- [ ] **5.4** Write tests: `test/parsing/python-strings.test.ts`
+- [x] **5.4** Write tests: `test/parsing/python-strings.test.ts`
   - Unit-test Python `extractStringContent` and `extractConcatenatedString` directly
   - Verify quote stripping, prefix handling, interpolation placeholders
 
