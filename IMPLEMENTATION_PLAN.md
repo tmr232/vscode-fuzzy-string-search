@@ -112,19 +112,19 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 6: Fuzzy Matching
 
-- [ ] **6.1** Install fuzzball (`bun add fuzzball`)
-- [ ] **6.2** Create `src/matching/fuzzy-matcher.ts`:
+- [x] **6.1** Install fuzzball (`bun add fuzzball`)
+- [x] **6.2** Create `src/matching/fuzzy-matcher.ts`:
   - Use `fuzz.partial_ratio` as scorer (matching source-strings' `rapidfuzz.fuzz.partial_ratio`)
   - `fuzz.extract(query, sourceStrings, { scorer: fuzz.partial_ratio, processor, cutoff, limit })`
   - Processor function extracts `.content` from `SourceString`
   - Return results sorted by score
-- [ ] **6.3** Write tests: `test/matching/fuzzy-matcher.test.ts`
+- [x] **6.3** Write tests: `test/matching/fuzzy-matcher.test.ts`
   - Exact match → score 100
   - Partial match → expected range
   - Below cutoff → excluded
   - Empty query → no results
   - Unicode strings
-- [ ] **6.4** Write ADR-003: Choice of partial_ratio scorer and fuzzball library
+- [x] **6.4** Write ADR-003: Choice of partial_ratio scorer and fuzzball library
 
 ## Phase 7: File Discovery & Caching
 

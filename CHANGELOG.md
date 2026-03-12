@@ -21,3 +21,7 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Add ADR-002: Language support plugin architecture
 - Create `src/parsing/string-collector.ts` — TreeCursor-based AST visitor that collects string literals via the LanguageSupport interface
 - Add tests for string collection (`test/parsing/string-collector.test.ts`) and Python string extraction (`test/parsing/python-strings.test.ts`)
+- Add `fuzzball` dependency for fuzzy string matching
+- Create `src/matching/fuzzy-matcher.ts` — wraps fuzzball's `partial_ratio` scorer with configurable cutoff and limit
+- Add tests for fuzzy matching (`test/matching/fuzzy-matcher.test.ts`)
+- Add ADR-003: Choice of partial_ratio scorer and fuzzball library

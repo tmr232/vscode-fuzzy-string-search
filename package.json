@@ -35,6 +35,7 @@
 		"vitest": "^4.0.18"
 	},
 	"dependencies": {
+		"fuzzball": "^2.2.3",
 		"tree-sitter-python": "^0.25.0",
 		"web-tree-sitter": "^0.26.6"
 	}
