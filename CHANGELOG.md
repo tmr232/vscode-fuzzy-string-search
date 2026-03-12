@@ -28,3 +28,9 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Create `src/files/file-discovery.ts` — workspace file discovery filtered by supported language extensions
 - Create `src/cache/string-cache.ts` — in-memory per-file cache for parsed source strings
 - Wire up cache invalidation in `extension.ts` via `onDidSaveTextDocument`, `onDidDeleteFiles`, and `FileSystemWatcher` (covers external edits)
+- Create `src/search/search-engine.ts` — orchestrates file discovery, caching, parsing, and fuzzy matching into a single search pipeline
+  - Concurrent file processing with configurable concurrency limit
+  - Supports cancellation via VSCode `CancellationToken`
+  - Incremental results via `onFileResults` callback
+  - Configurable score cutoff, max results, and include/exclude globs
+- Add integration tests for search engine (`test/search/search-engine.test.ts`)

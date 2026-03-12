@@ -142,18 +142,18 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 8: Search Engine (Orchestration)
 
-- [ ] **8.1** Create `src/search/search-engine.ts`:
+- [x] **8.1** Create `src/search/search-engine.ts`:
   - Accepts: query, scoreCutoff, includeGlob, excludeGlob
   - Pipeline: discover files → for each file: check cache → parse if needed → cache strings → fuzzy match → collect results
   - Return all results sorted by score (across files)
-- [ ] **8.2** Implement parallel file processing:
+- [x] **8.2** Implement parallel file processing:
   - Process files concurrently (e.g., `Promise.all` with concurrency limit)
   - Yield results incrementally (via callback or async generator) so UI updates as results arrive
-- [ ] **8.3** Implement cancellation:
+- [x] **8.3** Implement cancellation:
   - Accept `CancellationToken` (VSCode API)
   - Check token before processing each file
   - Pass `AbortController` to fuzzball's `extractAsPromised` for mid-search cancellation
-- [ ] **8.4** Write integration tests: `test/search/search-engine.test.ts`
+- [x] **8.4** Write integration tests: `test/search/search-engine.test.ts`
   - Given fixture files, verify end-to-end search returns expected results
 
 ## Phase 9: VSCode Side Panel UI
