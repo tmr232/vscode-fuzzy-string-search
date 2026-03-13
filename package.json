@@ -56,7 +56,7 @@
 		}
 	},
 	"scripts": {
-		"build": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+		"build": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --inject:./scripts/import-meta-url.js --define:import.meta.url=import_meta_url",
 		"watch": "bun run build --watch",
 		"test": "vitest run",
 		"test:watch": "vitest",
