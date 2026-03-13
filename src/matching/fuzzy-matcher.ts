@@ -40,11 +40,17 @@ export function fuzzyMatch(
 	const cutoff = options?.cutoff ?? DEFAULT_CUTOFF;
 	const limit = options?.limit ?? 0;
 
-	const results = fuzz.extract(query, sourceStrings, {
+	// Drop stings that are too short.
+	const relevantSourceStrings = sourceStrings.filter(
+		(str) => str.content.length * 2 >= query.length,
+	);
+
+	const results = fuzz.extract(query, relevantSourceStrings, {
 		scorer: fuzz.partial_ratio,
 		processor: (choice: SourceString) => choice.content,
 		cutoff,
 		limit,
+		full_process: false,
 	});
 
 	return results.map(([choice, score]: [SourceString, number, number]) => ({

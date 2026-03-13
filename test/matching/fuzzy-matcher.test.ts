@@ -1,3 +1,4 @@
+import * as fuzz from "fuzzball";
 import { describe, expect, it } from "vitest";
 import { fuzzyMatch } from "../../src/matching/fuzzy-matcher.js";
 import type { SourceString } from "../../src/types.js";
@@ -12,6 +13,22 @@ function makeSourceString(content: string, index = 0): SourceString {
 		endColumn: content.length,
 	};
 }
+
+describe("fullProcess", () => {
+	it("ensure this weird thing doesn't match (it matches with fullProcess)", () => {
+		const strings = [makeSourceString("(&&)(?='.+'\\s?)")];
+		const results = fuzzyMatch("abstract base class", strings);
+
+		expect(results).toHaveLength(0);
+	});
+
+	it("guarantee the correct score", () => {
+		const score = fuzz.partial_ratio("abstract base class", "(&&)(?='.+'\\s?)", {
+			full_process: false,
+		});
+		expect(score).toBe(7);
+	});
+});
 
 describe("fuzzyMatch", () => {
 	it("should return an exact match with score 100", () => {
