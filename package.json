@@ -5,8 +5,12 @@
 	"version": "0.0.1",
 	"publisher": "tmr232",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tmr232/vscode-fuzzy-string-grep"
+	},
 	"engines": {
-		"vscode": "^1.100.0"
+		"vscode": "^1.110.0"
 	},
 	"categories": [
 		"Other"
@@ -59,7 +63,9 @@
 		"download-wasm": "bun run scripts/download-wasm.ts",
 		"lint": "biome check . && oxlint",
 		"lint:fix": "biome check --fix .",
-		"format": "biome format --write ."
+		"format": "biome format --write .",
+		"vscode:prepublish": "bun run download-wasm && bun run build",
+		"package": "bun run vscode:prepublish && vsce package --no-dependencies"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.6",

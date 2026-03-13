@@ -10,6 +10,13 @@ node_modules/**
 tsconfig.json
 vitest.config.ts
 biome.json
+bun.lock
 *.md
 !README.md
 !CHANGELOG.md
+IMPLEMENTATION_PLAN.md
+PLAN.md
+AGENTS.md
+
+# Include WASM files (overrides .gitignore exclusion)
+!wasm/**

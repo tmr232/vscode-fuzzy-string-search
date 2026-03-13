@@ -175,12 +175,12 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Phase 10: Extension Packaging & WASM Bundling
 
-- [ ] **10.1** Configure esbuild/webpack to copy `.wasm` files into the output bundle
-- [ ] **10.2** Ensure `tree-sitter.wasm` (from web-tree-sitter) is included in the extension package
-- [ ] **10.3** Ensure language `.wasm` files (from `wasm/`) are included in the extension package
-- [ ] **10.4** Update `.vscodeignore` to include necessary wasm files but exclude source/test files
-- [ ] **10.5** Test packaging with `vsce package` (or `bun run vsce package`)
-- [ ] **10.6** Test installing the packaged `.vsix` in VSCode
+- [x] **10.1** Configure esbuild/webpack to copy `.wasm` files into the output bundle
+- [x] **10.2** Ensure `tree-sitter.wasm` (from web-tree-sitter) is included in the extension package
+- [x] **10.3** Ensure language `.wasm` files (from `wasm/`) are included in the extension package
+- [x] **10.4** Update `.vscodeignore` to include necessary wasm files but exclude source/test files
+- [x] **10.5** Test packaging with `vsce package` (or `bun run vsce package`)
+- [x] **10.6** Test installing the packaged `.vsix` in VSCode
 
 ## Phase 11: Polish & Documentation
 

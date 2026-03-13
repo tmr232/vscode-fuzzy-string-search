@@ -44,3 +44,9 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Register activity bar view container and webview view in `package.json`
 - Add configuration settings: `fuzzyStringGrep.defaultScoreCutoff` (default: 60), `fuzzyStringGrep.maxResults` (default: 100)
 - Wire search panel provider into `extension.ts` activation
+- Add `vscode:prepublish` script that downloads WASM files and builds the extension
+- Add `package` script for creating `.vsix` packages via `vsce`
+- Update `.vscodeignore` to include `wasm/` directory (overrides `.gitignore` exclusion)
+- Add `repository` field to `package.json`
+- Bump `engines.vscode` to `^1.110.0` to match `@types/vscode`
+- Verified `.vsix` package includes `out/extension.js`, `wasm/tree-sitter-python.wasm`, and `wasm/web-tree-sitter.wasm`
