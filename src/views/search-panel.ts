@@ -1,6 +1,7 @@
 import { join, relative } from "node:path";
 import * as vscode from "vscode";
 import type { StringCache } from "../cache/string-cache.js";
+import { formatAlignedMatch } from "../matching/alignment.js";
 import type { MatchResult } from "../matching/fuzzy-matcher.js";
 import { search } from "../search/search-engine.js";
 
@@ -91,7 +92,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 				if (token.isCancellationRequested) return;
 				this.postMessage({
 					type: "results",
-					results: formatResults(fileResults, workspaceRoot),
+					results: formatResults(fileResults, workspaceRoot, query),
 					done: false,
 				});
 			},
@@ -100,7 +101,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 				if (token.isCancellationRequested) return;
 				this.postMessage({
 					type: "results",
-					results: formatResults(allResults, workspaceRoot),
+					results: formatResults(allResults, workspaceRoot, query),
 					done: true,
 				});
 			})
@@ -144,13 +145,14 @@ interface FormattedResult {
 function formatResults(
 	results: MatchResult[],
 	workspaceRoot: string | undefined,
+	query: string,
 ): FormattedResult[] {
 	return results.map((r) => ({
 		filePath: r.sourceString.filePath,
 		relativePath: workspaceRoot
 			? relative(workspaceRoot, r.sourceString.filePath)
 			: r.sourceString.filePath,
-		content: r.sourceString.content,
+		content: formatAlignedMatch(r.sourceString.content, query),
 		score: r.score,
 		startLine: r.sourceString.startLine,
 		startColumn: r.sourceString.startColumn,

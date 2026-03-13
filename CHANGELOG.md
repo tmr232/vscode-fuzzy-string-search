@@ -50,3 +50,5 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Add `repository` field to `package.json`
 - Bump `engines.vscode` to `^1.110.0` to match `@types/vscode`
 - Verified `.vsix` package includes `out/extension.js`, `wasm/tree-sitter-python.wasm`, and `wasm/web-tree-sitter.wasm`
+- Add match alignment for search result display — shows the matched substring with surrounding context and ellipsis instead of the full string content (`src/matching/alignment.ts`)
+- Add ADR-004: Match alignment display strategy (sliding-window at display-time)
