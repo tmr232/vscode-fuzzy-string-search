@@ -2,6 +2,12 @@
 
 All notable changes to the "Fuzzy String Search" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- C/C++ language support: regular string literals (with `L`/`u`/`U`/`u8` prefixes), raw string literals (`R"(...)"`), escape sequences, and concatenated strings (including with comments between parts) — all via the `tree-sitter-cpp` grammar
+
 ## [0.1.0] - 2026-03-14
 
 ### Added

@@ -1,3 +1,4 @@
+import { cppLanguageSupport } from "./cpp.js";
 import type { LanguageSupport } from "./language-support.js";
 import { pythonLanguageSupport } from "./python.js";
 
@@ -17,6 +18,7 @@ function register(lang: LanguageSupport): void {
 
 // Register all supported languages
 register(pythonLanguageSupport);
+register(cppLanguageSupport);
 
 /**
  * Look up language support by file path (using its extension).
