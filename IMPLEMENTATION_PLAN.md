@@ -1,4 +1,4 @@
-# Implementation Plan: VSCode Fuzzy String Grep
+# Implementation Plan: VSCode Fuzzy String Search
 
 A VSCode extension for fuzzy-matching against strings in source code, using tree-sitter for parsing and fuzzball for matching. Modeled after the [source-strings](file:///C:/Code/github.com/tmr232/source-strings/) Python CLI tool.
 

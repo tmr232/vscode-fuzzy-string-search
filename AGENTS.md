@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A VSCode extension that fuzzy-matches user queries against string literals in source code, using tree-sitter for parsing and fuzzball for matching.
+A VSCode extension ("Fuzzy String Search") that fuzzy-matches user queries against string literals in source code, using tree-sitter for parsing and fuzzball for matching.
 
 ## Key Conventions
 
@@ -61,6 +61,7 @@ src/
     string-collector.ts     # Tree traversal → SourceString[]
   matching/
     fuzzy-matcher.ts        # fuzzball wrapper
+    alignment.ts            # Match alignment & display formatting
   cache/
     string-cache.ts         # Per-file in-memory cache
   files/

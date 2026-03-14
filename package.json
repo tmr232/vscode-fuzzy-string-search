@@ -1,8 +1,8 @@
 {
 	"name": "vscode-fuzzy-string-grep",
-	"displayName": "Fuzzy String Grep",
+	"displayName": "Fuzzy String Search",
 	"description": "Fuzzy-match user queries against string literals in source code using tree-sitter and fuzzball",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"publisher": "tmr232",
 	"license": "MIT",
 	"repository": {
@@ -21,32 +21,32 @@
 		"viewsContainers": {
 			"activitybar": [
 				{
-					"id": "fuzzy-string-grep",
-					"title": "Fuzzy String Grep",
+					"id": "fuzzy-string-search",
+					"title": "Fuzzy String Search",
 					"icon": "$(search)"
 				}
 			]
 		},
 		"views": {
-			"fuzzy-string-grep": [
+			"fuzzy-string-search": [
 				{
 					"type": "webview",
-					"id": "fuzzyStringGrep.searchPanel",
+					"id": "fuzzyStringSearch.searchPanel",
 					"name": "Search"
 				}
 			]
 		},
 		"configuration": {
-			"title": "Fuzzy String Grep",
+			"title": "Fuzzy String Search",
 			"properties": {
-				"fuzzyStringGrep.defaultScoreCutoff": {
+				"fuzzyStringSearch.defaultScoreCutoff": {
 					"type": "number",
 					"default": 60,
 					"minimum": 0,
 					"maximum": 100,
 					"description": "Minimum fuzzy match score (0–100) to include in results."
 				},
-				"fuzzyStringGrep.maxResults": {
+				"fuzzyStringSearch.maxResults": {
 					"type": "number",
 					"default": 100,
 					"minimum": 0,

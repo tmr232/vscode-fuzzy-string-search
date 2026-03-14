@@ -9,7 +9,7 @@ import {
 import type { MatchResult } from "../matching/fuzzy-matcher.js";
 import { search } from "../search/search-engine.js";
 
-export const VIEW_ID = "fuzzyStringGrep.searchPanel";
+export const VIEW_ID = "fuzzyStringSearch.searchPanel";
 
 interface SearchMessage {
 	type: "search";
@@ -50,7 +50,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 		};
 
-		const config = vscode.workspace.getConfiguration("fuzzyStringGrep");
+		const config = vscode.workspace.getConfiguration("fuzzyStringSearch");
 		const defaultCutoff = config.get<number>("defaultScoreCutoff", 60);
 		const maxResults = config.get<number>("maxResults", 100);
 

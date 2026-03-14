@@ -1,58 +1,23 @@
 # Changelog
 
-All notable changes to the "Fuzzy String Grep" extension will be documented in this file.
+All notable changes to the "Fuzzy String Search" extension will be documented in this file.
 
-## [Unreleased]
+## [0.1.0] - 2026-03-14
 
-- Initial project scaffolding
-- Add pre-commit hooks via prek (biome, ad-blocker, zizmor, ratchet-pin)
-- Add GitHub Actions CI workflow (lint, build, test on push/PR)
-- Add GitHub Actions publish workflow (VSCode Marketplace + Open VSX on tag)
-- Pin all GitHub Actions versions with ratchet
-- Add `@vscode/vsce` and `ovsx` as dev dependencies
-- Add tree-sitter integration via `web-tree-sitter` (WASM-based)
-- Add `tree-sitter-python` grammar as a dependency
-- Create `scripts/download-wasm.ts` to copy language WASM files into `wasm/`
-- Create `src/parsing/parser-manager.ts` for tree-sitter initialization, language loading, and parser creation
-- Add ADR-001: Use web-tree-sitter (WASM) over native node bindings
-- Define `LanguageSupport` interface for pluggable language support
-- Create language registry with lookup by file extension, VSCode language ID, or language ID
-- Implement Python language support (string extraction for all quote styles, f-strings, raw/byte strings, concatenated strings)
-- Add ADR-002: Language support plugin architecture
-- Create `src/parsing/string-collector.ts` — TreeCursor-based AST visitor that collects string literals via the LanguageSupport interface
-- Add tests for string collection (`test/parsing/string-collector.test.ts`) and Python string extraction (`test/parsing/python-strings.test.ts`)
-- Add `fuzzball` dependency for fuzzy string matching
-- Create `src/matching/fuzzy-matcher.ts` — wraps fuzzball's `partial_ratio` scorer with configurable cutoff and limit
-- Add tests for fuzzy matching (`test/matching/fuzzy-matcher.test.ts`)
-- Add ADR-003: Choice of partial_ratio scorer and fuzzball library
-- Create `src/files/file-discovery.ts` — workspace file discovery filtered by supported language extensions
-- Create `src/cache/string-cache.ts` — in-memory per-file cache for parsed source strings
-- Wire up cache invalidation in `extension.ts` via `onDidSaveTextDocument`, `onDidDeleteFiles`, and `FileSystemWatcher` (covers external edits)
-- Create `src/search/search-engine.ts` — orchestrates file discovery, caching, parsing, and fuzzy matching into a single search pipeline
-  - Concurrent file processing with configurable concurrency limit
-  - Supports cancellation via VSCode `CancellationToken`
-  - Incremental results via `onFileResults` callback
-  - Configurable score cutoff, max results, and include/exclude globs
-- Add integration tests for search engine (`test/search/search-engine.test.ts`)
-- Add side panel UI with WebviewViewProvider (`src/views/search-panel.ts`)
-  - Search input with debounced query (300ms)
-  - Collapsible filter section: score cutoff, include glob, exclude glob
-  - Results display with relative file path, line number, matched string content, and score
-  - Click-to-open: clicking a result opens the file at the matched location
-  - In-flight search cancellation when query changes
-  - Streaming results via `onFileResults` callback
-- Register activity bar view container and webview view in `package.json`
-- Add configuration settings: `fuzzyStringGrep.defaultScoreCutoff` (default: 60), `fuzzyStringGrep.maxResults` (default: 100)
-- Wire search panel provider into `extension.ts` activation
-- Add `vscode:prepublish` script that downloads WASM files and builds the extension
-- Add `package` script for creating `.vsix` packages via `vsce`
-- Update `.vscodeignore` to include `wasm/` directory (overrides `.gitignore` exclusion)
-- Add `repository` field to `package.json`
-- Bump `engines.vscode` to `^1.110.0` to match `@types/vscode`
-- Verified `.vsix` package includes `out/extension.js`, `wasm/tree-sitter-python.wasm`, and `wasm/web-tree-sitter.wasm`
-- Add match alignment for search result display — shows the matched substring with surrounding context and ellipsis instead of the full string content (`src/matching/alignment.ts`)
-- Add ADR-004: Match alignment display strategy (sliding-window at display-time)
-- Add `ContentSegment` type and `segments` field to `SourceString` for mapping content offsets back to source file positions
-- Update `LanguageSupport` interface: `extractStringContent` and `extractConcatenatedString` now return `StringExtractionResult` with segment info
-- Click-to-open now selects only the aligned (matched) portion of the string, not the entire string literal
-- Add `contentOffsetToPosition` for mapping content character offsets to source file line/column
+### Added
+
+- Side panel UI in the activity bar with search input, collapsible filters (score cutoff, include/exclude globs), and clickable results
+- Tree-sitter integration via `web-tree-sitter` (WASM-based) for accurate source code parsing
+- Python language support: single/double/triple-quoted strings, f-strings (interpolation → `{}`), raw strings, byte strings, and concatenated strings
+- Fuzzy matching using fuzzball's `partial_ratio` scorer with configurable score cutoff
+- Match alignment display: shows the matched substring with surrounding context and ellipsis
+- Click-to-navigate: clicking a result opens the file and selects the matched portion of the string
+- Streaming results: results appear incrementally as files are processed
+- In-memory per-file string cache with automatic invalidation on save, delete, and external file changes
+- Concurrent file processing with configurable concurrency limit
+- Search cancellation when the query changes mid-search
+- Configuration settings: `fuzzyStringSearch.defaultScoreCutoff` (default: 60), `fuzzyStringSearch.maxResults` (default: 100)
+- Pluggable language support architecture — new languages require only a `LanguageSupport` implementation and registry entry
+- Pre-commit hooks via prek (biome, ad-blocker, zizmor, ratchet-pin)
+- GitHub Actions CI workflow (lint, build, test on push/PR)
+- GitHub Actions publish workflow (VSCode Marketplace + Open VSX on tag)
