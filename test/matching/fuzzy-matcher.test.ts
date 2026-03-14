@@ -11,6 +11,15 @@ function makeSourceString(content: string, index = 0): SourceString {
 		startColumn: 0,
 		endLine: index,
 		endColumn: content.length,
+		segments: [
+			{
+				contentLength: content.length,
+				startLine: index,
+				startColumn: 0,
+				endLine: index,
+				endColumn: content.length,
+			},
+		],
 	};
 }
 
@@ -136,6 +145,7 @@ describe("fuzzyMatch", () => {
 			startColumn: 4,
 			endLine: 5,
 			endColumn: 17,
+			segments: [{ contentLength: 11, startLine: 5, startColumn: 5, endLine: 5, endColumn: 16 }],
 		};
 		const results = fuzzyMatch("hello world", [sourceString]);
 

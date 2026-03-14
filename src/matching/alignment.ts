@@ -1,4 +1,5 @@
 import * as fuzz from "fuzzball";
+import type { ContentSegment } from "../types.js";
 
 /**
  * Result of finding the best-matching alignment of a query within a target string.
@@ -87,4 +88,56 @@ export function formatAlignedMatch(content: string, query: string, contextChars 
 	const suffix = ctxEnd < content.length ? "…" : "";
 
 	return prefix + content.substring(ctxStart, ctxEnd) + suffix;
+}
+
+/**
+ * A source-file position (0-indexed line and column).
+ */
+export interface SourcePosition {
+	line: number;
+	column: number;
+}
+
+/**
+ * Map a character offset within the assembled content string to a
+ * source-file position using the segment mapping.
+ *
+ * Walks through segments, accumulating content lengths until it finds
+ * the segment containing the offset, then computes the line/column
+ * within that segment by counting newlines in the content.
+ *
+ * @param offset - Character offset within the content string.
+ * @param segments - The content segments from a SourceString.
+ * @param content - The full content string (used for newline counting in multi-line segments).
+ * @returns The source-file position, or `undefined` if segments are empty.
+ */
+export function contentOffsetToPosition(
+	offset: number,
+	segments: ContentSegment[],
+	content: string,
+): SourcePosition | undefined {
+	if (segments.length === 0) return undefined;
+
+	let consumed = 0;
+	for (const seg of segments) {
+		if (offset < consumed + seg.contentLength) {
+			const offsetInSegment = offset - consumed;
+			const segContent = content.substring(consumed, consumed + seg.contentLength);
+			const beforeOffset = segContent.substring(0, offsetInSegment);
+			const lines = beforeOffset.split("\n");
+			const lineOffset = lines.length - 1;
+			const lastLineLen = lines[lines.length - 1]?.length ?? 0;
+
+			return {
+				line: seg.startLine + lineOffset,
+				column: lineOffset === 0 ? seg.startColumn + lastLineLen : lastLineLen,
+			};
+		}
+		consumed += seg.contentLength;
+	}
+
+	// Offset is at or past the end — clamp to end of last segment.
+	const lastSeg = segments[segments.length - 1];
+	if (!lastSeg) return undefined;
+	return { line: lastSeg.endLine, column: lastSeg.endColumn };
 }

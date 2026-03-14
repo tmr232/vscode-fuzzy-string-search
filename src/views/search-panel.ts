@@ -1,7 +1,11 @@
 import { join, relative } from "node:path";
 import * as vscode from "vscode";
 import type { StringCache } from "../cache/string-cache.js";
-import { formatAlignedMatch } from "../matching/alignment.js";
+import {
+	contentOffsetToPosition,
+	findAlignment,
+	formatAlignedMatch,
+} from "../matching/alignment.js";
 import type { MatchResult } from "../matching/fuzzy-matcher.js";
 import { search } from "../search/search-engine.js";
 
@@ -147,18 +151,49 @@ function formatResults(
 	workspaceRoot: string | undefined,
 	query: string,
 ): FormattedResult[] {
-	return results.map((r) => ({
-		filePath: r.sourceString.filePath,
-		relativePath: workspaceRoot
-			? relative(workspaceRoot, r.sourceString.filePath)
-			: r.sourceString.filePath,
-		content: formatAlignedMatch(r.sourceString.content, query),
-		score: r.score,
-		startLine: r.sourceString.startLine,
-		startColumn: r.sourceString.startColumn,
-		endLine: r.sourceString.endLine,
-		endColumn: r.sourceString.endColumn,
-	}));
+	return results.map((r) => {
+		const { sourceString } = r;
+		const alignment = findAlignment(query, sourceString.content);
+
+		let startLine = sourceString.startLine;
+		let startColumn = sourceString.startColumn;
+		let endLine = sourceString.endLine;
+		let endColumn = sourceString.endColumn;
+
+		if (alignment && sourceString.segments.length > 0) {
+			const startPos = contentOffsetToPosition(
+				alignment.start,
+				sourceString.segments,
+				sourceString.content,
+			);
+			const endPos = contentOffsetToPosition(
+				alignment.end,
+				sourceString.segments,
+				sourceString.content,
+			);
+			if (startPos) {
+				startLine = startPos.line;
+				startColumn = startPos.column;
+			}
+			if (endPos) {
+				endLine = endPos.line;
+				endColumn = endPos.column;
+			}
+		}
+
+		return {
+			filePath: sourceString.filePath,
+			relativePath: workspaceRoot
+				? relative(workspaceRoot, sourceString.filePath)
+				: sourceString.filePath,
+			content: formatAlignedMatch(sourceString.content, query),
+			score: r.score,
+			startLine,
+			startColumn,
+			endLine,
+			endColumn,
+		};
+	});
 }
 
 function getWebviewHtml(defaultCutoff: number): string {

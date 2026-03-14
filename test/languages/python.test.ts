@@ -45,62 +45,62 @@ describe("PythonLanguageSupport", () => {
 		it("should extract double-quoted string content", () => {
 			const node = getFirstStringNode('x = "hello world"');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("hello world");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("hello world");
 		});
 
 		it("should extract single-quoted string content", () => {
 			const node = getFirstStringNode("x = 'single quotes'");
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("single quotes");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("single quotes");
 		});
 
 		it("should extract triple-quoted string content", () => {
 			const node = getFirstStringNode('x = """triple quoted"""');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("triple quoted");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("triple quoted");
 		});
 
 		it("should extract triple single-quoted string content", () => {
 			const node = getFirstStringNode("x = '''triple single'''");
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("triple single");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("triple single");
 		});
 
 		it("should replace f-string interpolations with {}", () => {
 			const node = getFirstStringNode('x = f"hello {name}"');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("hello {}");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("hello {}");
 		});
 
 		it("should handle multiple interpolations in f-strings", () => {
 			const node = getFirstStringNode('x = f"a {x} b {y} c"');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("a {} b {} c");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("a {} b {} c");
 		});
 
 		it("should handle raw strings (strip r prefix)", () => {
 			const node = getFirstStringNode('x = r"raw\\nstring"');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("raw\\nstring");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("raw\\nstring");
 		});
 
 		it("should handle byte strings (strip b prefix)", () => {
 			const node = getFirstStringNode('x = b"byte string"');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("byte string");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("byte string");
 		});
 
 		it("should handle empty strings", () => {
 			const node = getFirstStringNode('x = ""');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe("");
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe("");
 		});
 
 		it("should handle multiline triple-quoted strings", () => {
 			const source = 'x = """line one\nline two\nline three"""';
 			const node = getFirstStringNode(source);
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractStringContent(node)).toBe(
+			expect(pythonLanguageSupport.extractStringContent(node).content).toBe(
 				"line one\nline two\nline three",
 			);
 		});
@@ -110,7 +110,7 @@ describe("PythonLanguageSupport", () => {
 		it("should join adjacent string literals", () => {
 			const node = getFirstConcatNode('x = ("hello " "world")');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractConcatenatedString(node)).toBe("hello world");
+			expect(pythonLanguageSupport.extractConcatenatedString(node).content).toBe("hello world");
 		});
 
 		it("should join strings with inline comments between them", () => {
@@ -120,13 +120,13 @@ describe("PythonLanguageSupport", () => {
 )`;
 			const node = getFirstConcatNode(source);
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractConcatenatedString(node)).toBe("firstsecond");
+			expect(pythonLanguageSupport.extractConcatenatedString(node).content).toBe("firstsecond");
 		});
 
 		it("should handle concatenation of three strings", () => {
 			const node = getFirstConcatNode('x = ("a" "b" "c")');
 			expect(node).toBeDefined();
-			expect(pythonLanguageSupport.extractConcatenatedString(node)).toBe("abc");
+			expect(pythonLanguageSupport.extractConcatenatedString(node).content).toBe("abc");
 		});
 	});
 

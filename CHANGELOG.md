@@ -52,3 +52,7 @@ All notable changes to the "Fuzzy String Grep" extension will be documented in t
 - Verified `.vsix` package includes `out/extension.js`, `wasm/tree-sitter-python.wasm`, and `wasm/web-tree-sitter.wasm`
 - Add match alignment for search result display — shows the matched substring with surrounding context and ellipsis instead of the full string content (`src/matching/alignment.ts`)
 - Add ADR-004: Match alignment display strategy (sliding-window at display-time)
+- Add `ContentSegment` type and `segments` field to `SourceString` for mapping content offsets back to source file positions
+- Update `LanguageSupport` interface: `extractStringContent` and `extractConcatenatedString` now return `StringExtractionResult` with segment info
+- Click-to-open now selects only the aligned (matched) portion of the string, not the entire string literal
+- Add `contentOffsetToPosition` for mapping content character offsets to source file line/column

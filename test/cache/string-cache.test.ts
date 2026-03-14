@@ -10,6 +10,15 @@ function makeSourceString(content: string, filePath = "/test.py"): SourceString 
 		startColumn: 0,
 		endLine: 0,
 		endColumn: content.length,
+		segments: [
+			{
+				contentLength: content.length,
+				startLine: 0,
+				startColumn: 0,
+				endLine: 0,
+				endColumn: content.length,
+			},
+		],
 	};
 }
 

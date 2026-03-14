@@ -1,4 +1,15 @@
 import type { Node } from "web-tree-sitter";
+import type { ContentSegment } from "../types.js";
+
+/**
+ * Result of extracting string content from a tree-sitter node.
+ */
+export interface StringExtractionResult {
+	/** The assembled string content. */
+	content: string;
+	/** Mapping from content character ranges back to source file positions. */
+	segments: ContentSegment[];
+}
 
 /**
  * Interface for language-specific string extraction from tree-sitter ASTs.
@@ -38,11 +49,11 @@ export interface LanguageSupport {
 	 * Extract the text content from a single string literal node,
 	 * stripping quotes, prefixes, and replacing interpolations with `{}`.
 	 */
-	extractStringContent(node: Node): string;
+	extractStringContent(node: Node): StringExtractionResult;
 
 	/**
 	 * Extract the text content from a concatenated string node,
 	 * joining adjacent string literals into a single string.
 	 */
-	extractConcatenatedString(node: Node): string;
+	extractConcatenatedString(node: Node): StringExtractionResult;
 }

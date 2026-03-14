@@ -26,23 +26,27 @@ function collectFromCursor(
 		const nodeType = node.type;
 
 		if (concatTypes.has(nodeType)) {
+			const { content, segments } = language.extractConcatenatedString(node);
 			results.push({
-				content: language.extractConcatenatedString(node),
+				content,
 				filePath,
 				startLine: node.startPosition.row,
 				startColumn: node.startPosition.column,
 				endLine: node.endPosition.row,
 				endColumn: node.endPosition.column,
+				segments,
 			});
 			// Don't descend into children — we already extracted the full content
 		} else if (stringTypes.has(nodeType)) {
+			const { content, segments } = language.extractStringContent(node);
 			results.push({
-				content: language.extractStringContent(node),
+				content,
 				filePath,
 				startLine: node.startPosition.row,
 				startColumn: node.startPosition.column,
 				endLine: node.endPosition.row,
 				endColumn: node.endPosition.column,
+				segments,
 			});
 			// Don't descend into children
 		} else if (cursor.gotoFirstChild()) {
