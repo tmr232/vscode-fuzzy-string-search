@@ -212,3 +212,4 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 - [x] Verify pre-commit hooks in CI
 - [x] Run zizmor as a GitHub Action instead of a pre-commit hook
 - [x] Remove unneeded `.gitkeep` files
+- [ ] Fix the timers - they are currently inconsistent.
