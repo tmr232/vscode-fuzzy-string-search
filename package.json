@@ -1,5 +1,5 @@
 {
-	"name": "vscode-fuzzy-string-grep",
+	"name": "vscode-fuzzy-string-search",
 	"displayName": "Fuzzy String Search",
 	"description": "Fuzzy-match user queries against string literals in source code using tree-sitter and fuzzball",
 	"version": "0.1.0",
