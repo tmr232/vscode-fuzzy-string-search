@@ -473,7 +473,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 	}
 
 	function renderTimings(timings) {
-		if (!timings) { timingsEl.textContent = ''; return; }
+		if (!timings || timings.collectSec == null) { timingsEl.textContent = ''; return; }
 		timingsEl.textContent =
 			'collect: ' + timings.collectSec.toFixed(2) + 's · ' +
 			'match: ' + timings.matchSec.toFixed(2) + 's · ' +

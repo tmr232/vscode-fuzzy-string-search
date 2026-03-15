@@ -10,6 +10,10 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 - Collect and match phases are now sequential (collect all strings, then match all at once) so each timing reflects true wall time
 - Removed streaming results — results are now sent once when the search completes
 
+### Fixed
+
+- Fix search becoming unresponsive after upgrading from a version that used millisecond timings — stale persisted state with old field names crashed the webview script before event listeners were registered
+
 ### Added
 
 - Parsing progress indicator: shows "Collecting strings x/n files" in the status area while files are being parsed
