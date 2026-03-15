@@ -42,7 +42,7 @@ describe("search", () => {
 	});
 
 	it("should return empty results for an empty query", async () => {
-		const results = await search("", cache, WASM_DIR);
+		const { results } = await search("", cache, WASM_DIR);
 		expect(results).toHaveLength(0);
 	});
 
@@ -50,7 +50,7 @@ describe("search", () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
 
-		const results = await search("hello world", cache, WASM_DIR, {
+		const { results } = await search("hello world", cache, WASM_DIR, {
 			scoreCutoff: 60,
 		});
 
@@ -65,7 +65,7 @@ describe("search", () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
 
-		const results = await search("hello", cache, WASM_DIR, { scoreCutoff: 0 });
+		const { results } = await search("hello", cache, WASM_DIR, { scoreCutoff: 0 });
 
 		for (let i = 1; i < results.length; i++) {
 			const prev = results[i - 1];
@@ -86,7 +86,7 @@ describe("search", () => {
 		expect(cache.has(uriKey)).toBe(true);
 
 		// Second search — should use cache (no re-parse needed)
-		const results = await search("hello", cache, WASM_DIR);
+		const { results } = await search("hello", cache, WASM_DIR);
 		expect(results.length).toBeGreaterThanOrEqual(1);
 	});
 
@@ -94,7 +94,7 @@ describe("search", () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
 
-		const results = await search("string", cache, WASM_DIR, {
+		const { results } = await search("string", cache, WASM_DIR, {
 			scoreCutoff: 0,
 			maxResults: 3,
 		});
@@ -106,7 +106,7 @@ describe("search", () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
 
-		const results = await search("hello world", cache, WASM_DIR, {
+		const { results } = await search("hello world", cache, WASM_DIR, {
 			scoreCutoff: 90,
 		});
 
@@ -135,7 +135,7 @@ describe("search", () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
 
-		const results = await search("zzz_no_match_zzz_xyzzy", cache, WASM_DIR, {
+		const { results } = await search("zzz_no_match_zzz_xyzzy", cache, WASM_DIR, {
 			scoreCutoff: 99,
 		});
 
@@ -145,7 +145,7 @@ describe("search", () => {
 	it("should return empty results when no files are discovered", async () => {
 		discoverFilesMock.mockResolvedValue([]);
 
-		const results = await search("hello", cache, WASM_DIR);
+		const { results } = await search("hello", cache, WASM_DIR);
 		expect(results).toHaveLength(0);
 	});
 
@@ -154,7 +154,7 @@ describe("search", () => {
 		const txtPath = resolve(FIXTURE_DIR, "nonexistent.txt");
 		discoverFilesMock.mockResolvedValue([fakeUri(txtPath)] as never);
 
-		const results = await search("hello", cache, WASM_DIR, { scoreCutoff: 0 });
+		const { results } = await search("hello", cache, WASM_DIR, { scoreCutoff: 0 });
 		expect(results).toHaveLength(0);
 	});
 
@@ -163,7 +163,7 @@ describe("search", () => {
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
 
 		const token = { isCancellationRequested: true, onCancellationRequested: vi.fn() };
-		const results = await search("hello", cache, WASM_DIR, { token: token as never });
+		const { results } = await search("hello", cache, WASM_DIR, { token: token as never });
 
 		expect(results).toHaveLength(0);
 	});
@@ -174,7 +174,7 @@ describe("search", () => {
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath), fakeUri(samplePath)] as never);
 
 		// Even though it's the same file, the cache is keyed by URI so both calls parse
-		const results = await search("hello world", cache, WASM_DIR, {
+		const { results } = await search("hello world", cache, WASM_DIR, {
 			scoreCutoff: 60,
 		});
 
@@ -183,6 +183,18 @@ describe("search", () => {
 			(r) => r.sourceString.content === "hello world" && r.score === 100,
 		);
 		expect(exactMatches.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it("should return timing information", async () => {
+		const samplePath = resolve(FIXTURE_DIR, "sample.py");
+		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
+
+		const { timings } = await search("hello", cache, WASM_DIR);
+
+		expect(timings.totalMs).toBeGreaterThanOrEqual(0);
+		expect(timings.discoveryMs).toBeGreaterThanOrEqual(0);
+		expect(timings.collectMs).toBeGreaterThanOrEqual(0);
+		expect(timings.matchMs).toBeGreaterThanOrEqual(0);
 	});
 
 	it("should pass includeGlob and excludeGlob to discoverFiles", async () => {

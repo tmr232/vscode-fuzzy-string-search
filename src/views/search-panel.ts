@@ -7,6 +7,7 @@ import {
 	formatAlignedMatch,
 } from "../matching/alignment.js";
 import type { MatchResult } from "../matching/fuzzy-matcher.js";
+import type { SearchTimings } from "../search/search-engine.js";
 import { search } from "../search/search-engine.js";
 
 export const VIEW_ID = "fuzzyStringSearch.searchPanel";
@@ -17,6 +18,7 @@ interface SearchMessage {
 	scoreCutoff: number;
 	includeGlob: string;
 	excludeGlob: string;
+	currentFileOnly: boolean;
 }
 
 interface OpenFileMessage {
@@ -66,7 +68,6 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 	}
 
 	private handleSearch(message: SearchMessage, maxResults: number): void {
-		// Cancel any in-flight search
 		if (this.searchCts) {
 			this.searchCts.cancel();
 			this.searchCts.dispose();
@@ -86,12 +87,24 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 		const workspaceFolders = vscode.workspace.workspaceFolders;
 		const workspaceRoot = workspaceFolders?.[0]?.uri.fsPath;
 
+		let fileUris: vscode.Uri[] | undefined;
+		if (message.currentFileOnly) {
+			const activeUri = vscode.window.activeTextEditor?.document.uri;
+			if (activeUri) {
+				fileUris = [activeUri];
+			} else {
+				this.postMessage({ type: "results", results: [], done: true });
+				return;
+			}
+		}
+
 		search(query, this.cache, wasmDir, {
 			scoreCutoff: message.scoreCutoff,
 			maxResults,
 			includeGlob: message.includeGlob || undefined,
 			excludeGlob: message.excludeGlob || undefined,
 			token,
+			fileUris,
 			onFileResults: (fileResults) => {
 				if (token.isCancellationRequested) return;
 				this.postMessage({
@@ -101,12 +114,13 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 				});
 			},
 		})
-			.then((allResults) => {
+			.then(({ results: allResults, timings }) => {
 				if (token.isCancellationRequested) return;
 				this.postMessage({
 					type: "results",
 					results: formatResults(allResults, workspaceRoot, query),
 					done: true,
+					timings,
 				});
 			})
 			.catch((err: unknown) => {
@@ -243,12 +257,39 @@ function getWebviewHtml(defaultCutoff: number): string {
 	}
 	.advanced { display: none; }
 	.advanced.visible { display: block; }
+	.checkbox-group {
+		margin-bottom: 6px;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.checkbox-group label {
+		font-size: 11px;
+		color: var(--vscode-descriptionForeground);
+		cursor: pointer;
+	}
 	.status {
 		font-size: 11px;
 		color: var(--vscode-descriptionForeground);
 		margin: 6px 0;
 	}
+	.timings {
+		font-size: 10px;
+		color: var(--vscode-descriptionForeground);
+		margin-bottom: 4px;
+	}
 	.results { margin-top: 4px; }
+	.file-group-header {
+		padding: 4px 6px;
+		font-size: 11px;
+		font-weight: bold;
+		color: var(--vscode-descriptionForeground);
+		background: var(--vscode-sideBar-background);
+		border-bottom: 1px solid var(--vscode-panel-border);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.result-item {
 		padding: 4px 6px;
 		cursor: pointer;
@@ -281,6 +322,10 @@ function getWebviewHtml(defaultCutoff: number): string {
 	<div class="input-group">
 		<input type="text" id="query" placeholder="Search strings…" />
 	</div>
+	<div class="checkbox-group">
+		<input type="checkbox" id="currentFileOnly" />
+		<label for="currentFileOnly">Current file only</label>
+	</div>
 	<span class="toggle-link" id="toggleAdvanced">⋯ filters</span>
 	<div class="advanced" id="advancedSection">
 		<div class="input-group">
@@ -297,6 +342,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 		</div>
 	</div>
 	<div class="status" id="status"></div>
+	<div class="timings" id="timings"></div>
 	<div class="results" id="results"></div>
 
 <script>
@@ -305,13 +351,44 @@ function getWebviewHtml(defaultCutoff: number): string {
 	const scoreCutoffInput = document.getElementById('scoreCutoff');
 	const includeGlobInput = document.getElementById('includeGlob');
 	const excludeGlobInput = document.getElementById('excludeGlob');
+	const currentFileOnlyInput = document.getElementById('currentFileOnly');
 	const statusEl = document.getElementById('status');
+	const timingsEl = document.getElementById('timings');
 	const resultsEl = document.getElementById('results');
 	const toggleAdvanced = document.getElementById('toggleAdvanced');
 	const advancedSection = document.getElementById('advancedSection');
 
 	let debounceTimer = null;
+	let streamingResults = [];
 	const DEBOUNCE_MS = 300;
+
+	// Restore persisted state
+	const savedState = vscode.getState();
+	if (savedState) {
+		if (savedState.query) queryInput.value = savedState.query;
+		if (savedState.scoreCutoff) scoreCutoffInput.value = savedState.scoreCutoff;
+		if (savedState.includeGlob) includeGlobInput.value = savedState.includeGlob;
+		if (savedState.excludeGlob) excludeGlobInput.value = savedState.excludeGlob;
+		if (savedState.currentFileOnly) currentFileOnlyInput.checked = savedState.currentFileOnly;
+		if (savedState.results && savedState.results.length > 0) {
+			renderResults(savedState.results);
+		}
+		if (savedState.timings) {
+			renderTimings(savedState.timings);
+		}
+	}
+
+	function saveState(results, timings) {
+		vscode.setState({
+			query: queryInput.value,
+			scoreCutoff: scoreCutoffInput.value,
+			includeGlob: includeGlobInput.value,
+			excludeGlob: excludeGlobInput.value,
+			currentFileOnly: currentFileOnlyInput.checked,
+			results: results || [],
+			timings: timings || null,
+		});
+	}
 
 	toggleAdvanced.addEventListener('click', () => {
 		advancedSection.classList.toggle('visible');
@@ -329,6 +406,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 				scoreCutoff: parseInt(scoreCutoffInput.value, 10) || 60,
 				includeGlob: includeGlobInput.value,
 				excludeGlob: excludeGlobInput.value,
+				currentFileOnly: currentFileOnlyInput.checked,
 			});
 		}, DEBOUNCE_MS);
 	}
@@ -337,11 +415,42 @@ function getWebviewHtml(defaultCutoff: number): string {
 	scoreCutoffInput.addEventListener('change', triggerSearch);
 	includeGlobInput.addEventListener('input', triggerSearch);
 	excludeGlobInput.addEventListener('input', triggerSearch);
+	currentFileOnlyInput.addEventListener('change', triggerSearch);
 
 	function escapeHtml(text) {
 		const div = document.createElement('div');
 		div.textContent = text;
 		return div.innerHTML;
+	}
+
+	function renderTimings(timings) {
+		if (!timings) { timingsEl.textContent = ''; return; }
+		timingsEl.textContent =
+			'collect: ' + timings.collectMs.toFixed(0) + 'ms · ' +
+			'match: ' + timings.matchMs.toFixed(0) + 'ms · ' +
+			'total: ' + timings.totalMs.toFixed(0) + 'ms';
+	}
+
+	function createResultItem(r) {
+		const item = document.createElement('div');
+		item.className = 'result-item';
+		item.innerHTML =
+			'<div class="result-file">' +
+				'<span class="result-score">' + r.score + '</span>' +
+				escapeHtml(r.relativePath) + ':' + (r.startLine + 1) +
+			'</div>' +
+			'<div class="result-content">' + escapeHtml(r.content) + '</div>';
+		item.addEventListener('click', () => {
+			vscode.postMessage({
+				type: 'openFile',
+				filePath: r.filePath,
+				startLine: r.startLine,
+				startColumn: r.startColumn,
+				endLine: r.endLine,
+				endColumn: r.endColumn,
+			});
+		});
+		return item;
 	}
 
 	function renderResults(results) {
@@ -351,39 +460,54 @@ function getWebviewHtml(defaultCutoff: number): string {
 			return;
 		}
 		statusEl.textContent = results.length + ' result' + (results.length === 1 ? '' : 's');
+
+		// Group results by file
+		const groups = new Map();
 		for (const r of results) {
-			const item = document.createElement('div');
-			item.className = 'result-item';
-			item.innerHTML =
-				'<div class="result-file">' +
-					'<span class="result-score">' + r.score + '</span>' +
-					escapeHtml(r.relativePath) + ':' + (r.startLine + 1) +
-				'</div>' +
-				'<div class="result-content">' + escapeHtml(r.content) + '</div>';
-			item.addEventListener('click', () => {
-				vscode.postMessage({
-					type: 'openFile',
-					filePath: r.filePath,
-					startLine: r.startLine,
-					startColumn: r.startColumn,
-					endLine: r.endLine,
-					endColumn: r.endColumn,
-				});
-			});
-			resultsEl.appendChild(item);
+			const key = r.relativePath;
+			if (!groups.has(key)) groups.set(key, []);
+			groups.get(key).push(r);
 		}
+
+		for (const [filePath, fileResults] of groups) {
+			const header = document.createElement('div');
+			header.className = 'file-group-header';
+			header.textContent = filePath + ' (' + fileResults.length + ')';
+			resultsEl.appendChild(header);
+
+			for (const r of fileResults) {
+				resultsEl.appendChild(createResultItem(r));
+			}
+		}
+	}
+
+	function appendStreamingResults(results) {
+		for (const r of results) {
+			resultsEl.appendChild(createResultItem(r));
+		}
+		const total = resultsEl.querySelectorAll('.result-item').length;
+		statusEl.textContent = 'Searching… ' + total + ' result' + (total === 1 ? '' : 's') + ' so far';
 	}
 
 	window.addEventListener('message', (event) => {
 		const message = event.data;
 		if (message.type === 'searching') {
 			statusEl.textContent = 'Searching…';
+			timingsEl.textContent = '';
+			resultsEl.innerHTML = '';
+			streamingResults = [];
 		} else if (message.type === 'results') {
 			if (message.done) {
 				renderResults(message.results);
+				renderTimings(message.timings);
+				saveState(message.results, message.timings);
+			} else {
+				streamingResults.push(...message.results);
+				appendStreamingResults(message.results);
 			}
 		} else if (message.type === 'error') {
 			statusEl.textContent = 'Error: ' + message.message;
+			timingsEl.textContent = '';
 			resultsEl.innerHTML = '';
 		}
 	});

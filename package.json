@@ -23,7 +23,7 @@
 				{
 					"id": "fuzzy-string-search",
 					"title": "Fuzzy String Search",
-					"icon": "$(search)"
+					"icon": "media/icon.svg"
 				}
 			]
 		},

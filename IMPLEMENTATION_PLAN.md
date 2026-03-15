@@ -197,9 +197,18 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 
 ## Future Work (Post-MVP)
 
-- [ ] Add C++ language support (`tree-sitter-cpp`)
+- [x] Add C++ language support (`tree-sitter-cpp`)
 - [ ] Add more languages (JavaScript, TypeScript, Go, Rust, etc.)
 - [ ] Persistent cache (survive extension restarts)
 - [ ] Workspace symbol provider integration
 - [ ] Result highlighting in editor decorations
 - [ ] Settings for choosing scorer (partial_ratio, token_set_ratio, etc.)
+- [x] Print timings — how long to collect all the strings, how long to match
+- [x] Group results by file
+- [x] Persist results when hiding and re-opening the search view
+- [x] Search in current file
+- [x] Show results as they are found (streaming/incremental UI updates)
+- [x] Better icon (distinct from the built-in search icon)
+- [x] Verify pre-commit hooks in CI
+- [x] Run zizmor as a GitHub Action instead of a pre-commit hook
+- [x] Remove unneeded `.gitkeep` files
