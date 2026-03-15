@@ -16,6 +16,7 @@ interface SearchMessage {
 	type: "search";
 	query: string;
 	scoreCutoff: number;
+	minLengthRatio: number;
 	includeGlob: string;
 	excludeGlob: string;
 	currentFileOnly: boolean;
@@ -100,6 +101,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 
 		search(query, this.cache, wasmDir, {
 			scoreCutoff: message.scoreCutoff,
+			minLengthRatio: message.minLengthRatio,
 			maxResults,
 			includeGlob: message.includeGlob || undefined,
 			excludeGlob: message.excludeGlob || undefined,
@@ -333,6 +335,10 @@ function getWebviewHtml(defaultCutoff: number): string {
 			<input type="number" id="scoreCutoff" value="${defaultCutoff}" min="0" max="100" />
 		</div>
 		<div class="input-group">
+			<label>Min length ratio (%)</label>
+			<input type="number" id="minLengthRatio" value="50" min="0" max="100" />
+		</div>
+		<div class="input-group">
 			<label>Files to include</label>
 			<input type="text" id="includeGlob" placeholder="e.g. **/*.py" />
 		</div>
@@ -349,6 +355,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 	const vscode = acquireVsCodeApi();
 	const queryInput = document.getElementById('query');
 	const scoreCutoffInput = document.getElementById('scoreCutoff');
+	const minLengthRatioInput = document.getElementById('minLengthRatio');
 	const includeGlobInput = document.getElementById('includeGlob');
 	const excludeGlobInput = document.getElementById('excludeGlob');
 	const currentFileOnlyInput = document.getElementById('currentFileOnly');
@@ -367,6 +374,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 	if (savedState) {
 		if (savedState.query) queryInput.value = savedState.query;
 		if (savedState.scoreCutoff) scoreCutoffInput.value = savedState.scoreCutoff;
+		if (savedState.minLengthRatio) minLengthRatioInput.value = savedState.minLengthRatio;
 		if (savedState.includeGlob) includeGlobInput.value = savedState.includeGlob;
 		if (savedState.excludeGlob) excludeGlobInput.value = savedState.excludeGlob;
 		if (savedState.currentFileOnly) currentFileOnlyInput.checked = savedState.currentFileOnly;
@@ -382,6 +390,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 		vscode.setState({
 			query: queryInput.value,
 			scoreCutoff: scoreCutoffInput.value,
+			minLengthRatio: minLengthRatioInput.value,
 			includeGlob: includeGlobInput.value,
 			excludeGlob: excludeGlobInput.value,
 			currentFileOnly: currentFileOnlyInput.checked,
@@ -404,6 +413,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 				type: 'search',
 				query: queryInput.value,
 				scoreCutoff: parseInt(scoreCutoffInput.value, 10) || 60,
+				minLengthRatio: parseInt(minLengthRatioInput.value, 10) || 50,
 				includeGlob: includeGlobInput.value,
 				excludeGlob: excludeGlobInput.value,
 				currentFileOnly: currentFileOnlyInput.checked,
@@ -413,6 +423,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 
 	queryInput.addEventListener('input', triggerSearch);
 	scoreCutoffInput.addEventListener('change', triggerSearch);
+	minLengthRatioInput.addEventListener('change', triggerSearch);
 	includeGlobInput.addEventListener('input', triggerSearch);
 	excludeGlobInput.addEventListener('input', triggerSearch);
 	currentFileOnlyInput.addEventListener('change', triggerSearch);

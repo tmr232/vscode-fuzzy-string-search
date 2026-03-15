@@ -32,6 +32,8 @@ export interface SearchOptions {
 	scoreCutoff?: number;
 	/** Maximum number of results to return. Default: 100. */
 	maxResults?: number;
+	/** Minimum length ratio (0–100): result must be at least this % of query length. Default: 50. */
+	minLengthRatio?: number;
 	/** Glob pattern to restrict which files are searched. */
 	includeGlob?: string;
 	/** Glob pattern to exclude files from search. */
@@ -160,7 +162,10 @@ export async function search(
 		if (!strings || strings.length === 0) return;
 
 		const matchStart = performance.now();
-		const fileResults = fuzzyMatch(query, strings, { cutoff: scoreCutoff });
+		const fileResults = fuzzyMatch(query, strings, {
+			cutoff: scoreCutoff,
+			minLengthRatio: options?.minLengthRatio,
+		});
 		matchMs += performance.now() - matchStart;
 		if (fileResults.length === 0) return;
 

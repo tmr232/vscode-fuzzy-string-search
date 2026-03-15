@@ -19,9 +19,12 @@ export interface MatchOptions {
 	cutoff?: number;
 	/** Maximum number of results to return. Default: no limit (0). */
 	limit?: number;
+	/** Minimum length ratio (0–100): result must be at least this % of query length. Default: 50. */
+	minLengthRatio?: number;
 }
 
 const DEFAULT_CUTOFF = 60;
+const DEFAULT_MIN_LENGTH_RATIO = 50;
 
 /**
  * Fuzzy-match a query against an array of source strings using partial_ratio.
@@ -39,10 +42,11 @@ export function fuzzyMatch(
 
 	const cutoff = options?.cutoff ?? DEFAULT_CUTOFF;
 	const limit = options?.limit ?? 0;
+	const minLengthRatio = options?.minLengthRatio ?? DEFAULT_MIN_LENGTH_RATIO;
 
-	// Drop stings that are too short.
+	// Drop strings that are too short relative to the query.
 	const relevantSourceStrings = sourceStrings.filter(
-		(str) => str.content.length * 2 >= query.length,
+		(str) => str.content.length * 100 >= query.length * minLengthRatio,
 	);
 
 	const results = fuzz.extract(query, relevantSourceStrings, {
