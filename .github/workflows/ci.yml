@@ -35,3 +35,41 @@ jobs:
 
       - name: Test
         run: bun run test
+
+      - name: Package VSIX
+        run: bun run package
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4 # ratchet:actions/upload-artifact@v4
+        with:
+          name: fuzzy-string-search-vsix
+          path: "*.vsix"
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # ratchet:oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install prek
+        run: curl -fsSL https://prek.j178.dev/install.sh | sh
+
+      - name: Run pre-commit hooks
+        run: prek run --all-files
+
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: zizmorcore/zizmor@v0.5.2
