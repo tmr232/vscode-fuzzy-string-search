@@ -328,6 +328,10 @@ function getWebviewHtml(defaultCutoff: number): string {
 		<input type="checkbox" id="currentFileOnly" />
 		<label for="currentFileOnly">Current file only</label>
 	</div>
+	<div class="checkbox-group">
+		<input type="checkbox" id="groupByFile" />
+		<label for="groupByFile">Group by file</label>
+	</div>
 	<span class="toggle-link" id="toggleAdvanced">⋯ filters</span>
 	<div class="advanced" id="advancedSection">
 		<div class="input-group">
@@ -359,6 +363,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 	const includeGlobInput = document.getElementById('includeGlob');
 	const excludeGlobInput = document.getElementById('excludeGlob');
 	const currentFileOnlyInput = document.getElementById('currentFileOnly');
+	const groupByFileInput = document.getElementById('groupByFile');
 	const statusEl = document.getElementById('status');
 	const timingsEl = document.getElementById('timings');
 	const resultsEl = document.getElementById('results');
@@ -378,6 +383,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 		if (savedState.includeGlob) includeGlobInput.value = savedState.includeGlob;
 		if (savedState.excludeGlob) excludeGlobInput.value = savedState.excludeGlob;
 		if (savedState.currentFileOnly) currentFileOnlyInput.checked = savedState.currentFileOnly;
+		if (savedState.groupByFile) groupByFileInput.checked = savedState.groupByFile;
 		if (savedState.results && savedState.results.length > 0) {
 			renderResults(savedState.results);
 		}
@@ -394,6 +400,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 			includeGlob: includeGlobInput.value,
 			excludeGlob: excludeGlobInput.value,
 			currentFileOnly: currentFileOnlyInput.checked,
+			groupByFile: groupByFileInput.checked,
 			results: results || [],
 			timings: timings || null,
 		});
@@ -427,6 +434,13 @@ function getWebviewHtml(defaultCutoff: number): string {
 	includeGlobInput.addEventListener('input', triggerSearch);
 	excludeGlobInput.addEventListener('input', triggerSearch);
 	currentFileOnlyInput.addEventListener('change', triggerSearch);
+	groupByFileInput.addEventListener('change', () => {
+		const state = vscode.getState();
+		if (state && state.results && state.results.length > 0) {
+			renderResults(state.results);
+			saveState(state.results, state.timings);
+		}
+	});
 
 	function escapeHtml(text) {
 		const div = document.createElement('div');
@@ -472,21 +486,26 @@ function getWebviewHtml(defaultCutoff: number): string {
 		}
 		statusEl.textContent = results.length + ' result' + (results.length === 1 ? '' : 's');
 
-		// Group results by file
-		const groups = new Map();
-		for (const r of results) {
-			const key = r.relativePath;
-			if (!groups.has(key)) groups.set(key, []);
-			groups.get(key).push(r);
-		}
+		if (groupByFileInput.checked) {
+			const groups = new Map();
+			for (const r of results) {
+				const key = r.relativePath;
+				if (!groups.has(key)) groups.set(key, []);
+				groups.get(key).push(r);
+			}
 
-		for (const [filePath, fileResults] of groups) {
-			const header = document.createElement('div');
-			header.className = 'file-group-header';
-			header.textContent = filePath + ' (' + fileResults.length + ')';
-			resultsEl.appendChild(header);
+			for (const [filePath, fileResults] of groups) {
+				const header = document.createElement('div');
+				header.className = 'file-group-header';
+				header.textContent = filePath + ' (' + fileResults.length + ')';
+				resultsEl.appendChild(header);
 
-			for (const r of fileResults) {
+				for (const r of fileResults) {
+					resultsEl.appendChild(createResultItem(r));
+				}
+			}
+		} else {
+			for (const r of results) {
 				resultsEl.appendChild(createResultItem(r));
 			}
 		}
