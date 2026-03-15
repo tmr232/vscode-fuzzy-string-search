@@ -1,5 +1,8 @@
 # Fuzzy String Search
 
+> [!IMPORTANT]
+> This is a vibe-coded prototype
+
 A Visual Studio Code extension that fuzzy-matches your queries against string literals in source code. It uses [tree-sitter](https://tree-sitter.github.io/) (via WASM) to parse files and extract strings, then scores them with [fuzzball](https://www.npmjs.com/package/fuzzball)'s `partial_ratio` scorer.
 
 Think of it as "grep for string contents" — but fuzzy, so typos and partial matches still find what you're looking for.
