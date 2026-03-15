@@ -265,6 +265,34 @@ function getWebviewHtml(defaultCutoff: number): string {
 		align-items: center;
 		gap: 4px;
 	}
+	.checkbox-group input[type="checkbox"] {
+		appearance: none;
+		width: 14px;
+		height: 14px;
+		border: 1px solid var(--vscode-checkbox-border);
+		background: var(--vscode-checkbox-background);
+		border-radius: 3px;
+		cursor: pointer;
+		position: relative;
+		margin: 0;
+	}
+	.checkbox-group input[type="checkbox"]:focus {
+		outline: 1px solid var(--vscode-focusBorder);
+		outline-offset: -1px;
+	}
+	.checkbox-group input[type="checkbox"]:checked {
+		background: var(--vscode-checkbox-selectBackground, var(--vscode-checkbox-background));
+		border-color: var(--vscode-checkbox-selectBorder, var(--vscode-checkbox-border));
+	}
+	.checkbox-group input[type="checkbox"]:checked::after {
+		content: '✓';
+		position: absolute;
+		top: -1px;
+		left: 1px;
+		font-size: 12px;
+		line-height: 14px;
+		color: var(--vscode-checkbox-foreground);
+	}
 	.checkbox-group label {
 		font-size: 11px;
 		color: var(--vscode-descriptionForeground);
