@@ -107,21 +107,12 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			excludeGlob: message.excludeGlob || undefined,
 			token,
 			fileUris,
-			onFileResults: (fileResults) => {
-				if (token.isCancellationRequested) return;
-				this.postMessage({
-					type: "results",
-					results: formatResults(fileResults, workspaceRoot, query),
-					done: false,
-				});
-			},
 		})
 			.then(({ results: allResults, timings }) => {
 				if (token.isCancellationRequested) return;
 				this.postMessage({
 					type: "results",
 					results: formatResults(allResults, workspaceRoot, query),
-					done: true,
 					timings,
 				});
 			})
@@ -399,7 +390,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 	const advancedSection = document.getElementById('advancedSection');
 
 	let debounceTimer = null;
-	let streamingResults = [];
+	
 	const DEBOUNCE_MS = 300;
 
 	// Restore persisted state
@@ -479,9 +470,9 @@ function getWebviewHtml(defaultCutoff: number): string {
 	function renderTimings(timings) {
 		if (!timings) { timingsEl.textContent = ''; return; }
 		timingsEl.textContent =
-			'collect: ' + timings.collectMs.toFixed(0) + 'ms · ' +
-			'match: ' + timings.matchMs.toFixed(0) + 'ms · ' +
-			'total: ' + timings.totalMs.toFixed(0) + 'ms';
+			'collect: ' + timings.collectSec.toFixed(2) + 's · ' +
+			'match: ' + timings.matchSec.toFixed(2) + 's · ' +
+			'total: ' + timings.totalSec.toFixed(2) + 's';
 	}
 
 	function createResultItem(r) {
@@ -539,30 +530,16 @@ function getWebviewHtml(defaultCutoff: number): string {
 		}
 	}
 
-	function appendStreamingResults(results) {
-		for (const r of results) {
-			resultsEl.appendChild(createResultItem(r));
-		}
-		const total = resultsEl.querySelectorAll('.result-item').length;
-		statusEl.textContent = 'Searching… ' + total + ' result' + (total === 1 ? '' : 's') + ' so far';
-	}
-
 	window.addEventListener('message', (event) => {
 		const message = event.data;
 		if (message.type === 'searching') {
 			statusEl.textContent = 'Searching…';
 			timingsEl.textContent = '';
 			resultsEl.innerHTML = '';
-			streamingResults = [];
 		} else if (message.type === 'results') {
-			if (message.done) {
-				renderResults(message.results);
-				renderTimings(message.timings);
-				saveState(message.results, message.timings);
-			} else {
-				streamingResults.push(...message.results);
-				appendStreamingResults(message.results);
-			}
+			renderResults(message.results);
+			renderTimings(message.timings);
+			saveState(message.results, message.timings);
 		} else if (message.type === 'error') {
 			statusEl.textContent = 'Error: ' + message.message;
 			timingsEl.textContent = '';

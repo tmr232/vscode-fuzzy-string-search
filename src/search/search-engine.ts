@@ -11,17 +11,17 @@ import { collectStrings } from "../parsing/string-collector.js";
 import type { SourceString } from "../types.js";
 
 /**
- * Timing information for a search operation.
+ * Timing information for a search operation (wall-clock seconds).
  */
 export interface SearchTimings {
-	/** Milliseconds spent discovering files. */
-	discoveryMs: number;
-	/** Milliseconds spent collecting strings (parsing). */
-	collectMs: number;
-	/** Milliseconds spent fuzzy matching. */
-	matchMs: number;
-	/** Total wall-clock milliseconds. */
-	totalMs: number;
+	/** Seconds spent discovering files. */
+	discoverySec: number;
+	/** Seconds spent collecting strings (parsing). */
+	collectSec: number;
+	/** Seconds spent fuzzy matching. */
+	matchSec: number;
+	/** Total wall-clock seconds. */
+	totalSec: number;
 }
 
 /**
@@ -40,8 +40,6 @@ export interface SearchOptions {
 	excludeGlob?: string;
 	/** Cancellation token for aborting the search. */
 	token?: vscode.CancellationToken;
-	/** Called each time results from a single file are ready. */
-	onFileResults?: (results: MatchResult[]) => void;
 	/** Restrict search to a specific set of file URIs instead of discovering files. */
 	fileUris?: vscode.Uri[];
 }
@@ -131,7 +129,7 @@ export async function search(
 ): Promise<SearchResult> {
 	const emptyResult: SearchResult = {
 		results: [],
-		timings: { discoveryMs: 0, collectMs: 0, matchMs: 0, totalMs: 0 },
+		timings: { discoverySec: 0, collectSec: 0, matchSec: 0, totalSec: 0 },
 	};
 	if (query === "") return emptyResult;
 
@@ -141,6 +139,7 @@ export async function search(
 
 	if (token?.isCancellationRequested) return emptyResult;
 
+	const toSec = (ms: number) => ms / 1000;
 	const totalStart = performance.now();
 
 	await initTreeSitter(wasmDir);
@@ -148,40 +147,39 @@ export async function search(
 	const discoveryStart = performance.now();
 	const files =
 		options?.fileUris ?? (await discoverFiles(options?.includeGlob, options?.excludeGlob, token));
-	const discoveryMs = performance.now() - discoveryStart;
+	const discoverySec = toSec(performance.now() - discoveryStart);
 	if (token?.isCancellationRequested) return emptyResult;
 
 	const allResults: MatchResult[] = [];
-	let collectMs = 0;
-	let matchMs = 0;
+	const allStrings: SourceString[] = [];
 
+	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
-		const collectStart = performance.now();
 		const strings = await getStringsForFile(uri, cache, wasmDir);
-		collectMs += performance.now() - collectStart;
 		if (!strings || strings.length === 0) return;
+		allStrings.push(...strings);
+	});
+	const collectSec = toSec(performance.now() - collectStart);
 
-		const matchStart = performance.now();
-		const fileResults = fuzzyMatch(query, strings, {
+	const matchStart = performance.now();
+	if (allStrings.length > 0) {
+		const fileResults = fuzzyMatch(query, allStrings, {
 			cutoff: scoreCutoff,
 			minLengthRatio: options?.minLengthRatio,
 		});
-		matchMs += performance.now() - matchStart;
-		if (fileResults.length === 0) return;
-
 		allResults.push(...fileResults);
-		options?.onFileResults?.(fileResults);
-	});
+	}
+	const matchSec = toSec(performance.now() - matchStart);
 
 	allResults.sort((a, b) => b.score - a.score);
 
 	const results =
 		maxResults > 0 && allResults.length > maxResults ? allResults.slice(0, maxResults) : allResults;
 
-	const totalMs = performance.now() - totalStart;
+	const totalSec = toSec(performance.now() - totalStart);
 
 	return {
 		results,
-		timings: { discoveryMs, collectMs, matchMs, totalMs },
+		timings: { discoverySec, collectSec, matchSec, totalSec },
 	};
 }

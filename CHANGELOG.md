@@ -4,6 +4,12 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 
 ## [Unreleased]
 
+### Changed
+
+- Search timings now show wall-clock seconds instead of summed per-worker milliseconds, giving an accurate picture of actual user-experienced latency
+- Collect and match phases are now sequential (collect all strings, then match all at once) so each timing reflects true wall time
+- Removed streaming results — results are now sent once when the search completes
+
 ### Added
 
 - "Group by file" checkbox in the search panel — when checked, results are grouped under file headers; when unchecked (default), results are shown as a flat list sorted by score

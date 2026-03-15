@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StringCache } from "../../src/cache/string-cache.js";
-import type { MatchResult } from "../../src/matching/fuzzy-matcher.js";
+
 import { resetParserManager } from "../../src/parsing/parser-manager.js";
 import { search } from "../../src/search/search-engine.js";
 
@@ -115,22 +115,6 @@ describe("search", () => {
 		}
 	});
 
-	it("should call onFileResults callback for each file with matches", async () => {
-		const samplePath = resolve(FIXTURE_DIR, "sample.py");
-		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
-
-		const batches: MatchResult[][] = [];
-		await search("hello", cache, WASM_DIR, {
-			scoreCutoff: 0,
-			onFileResults: (results) => batches.push(results),
-		});
-
-		expect(batches.length).toBeGreaterThanOrEqual(1);
-		for (const batch of batches) {
-			expect(batch.length).toBeGreaterThan(0);
-		}
-	});
-
 	it("should handle files with no matching strings gracefully", async () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		discoverFilesMock.mockResolvedValue([fakeUri(samplePath)] as never);
@@ -191,10 +175,10 @@ describe("search", () => {
 
 		const { timings } = await search("hello", cache, WASM_DIR);
 
-		expect(timings.totalMs).toBeGreaterThanOrEqual(0);
-		expect(timings.discoveryMs).toBeGreaterThanOrEqual(0);
-		expect(timings.collectMs).toBeGreaterThanOrEqual(0);
-		expect(timings.matchMs).toBeGreaterThanOrEqual(0);
+		expect(timings.totalSec).toBeGreaterThanOrEqual(0);
+		expect(timings.discoverySec).toBeGreaterThanOrEqual(0);
+		expect(timings.collectSec).toBeGreaterThanOrEqual(0);
+		expect(timings.matchSec).toBeGreaterThanOrEqual(0);
 	});
 
 	it("should pass includeGlob and excludeGlob to discoverFiles", async () => {
