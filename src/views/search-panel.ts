@@ -542,7 +542,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 			timingsEl.textContent = '';
 			resultsEl.innerHTML = '';
 		} else if (message.type === 'progress') {
-			statusEl.textContent = 'Collecting strings ' + message.parsed + '/' + message.total + ' files';
+			statusEl.textContent = 'Collecting strings from' + message.parsed + '/' + message.total + ' files';
 		} else if (message.type === 'results') {
 			renderResults(message.results);
 			renderTimings(message.timings);
