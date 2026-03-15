@@ -12,6 +12,7 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 
 ### Added
 
+- Parsing progress indicator: shows "Collecting strings x/n files" in the status area while files are being parsed
 - "Group by file" checkbox in the search panel — when checked, results are grouped under file headers; when unchecked (default), results are shown as a flat list sorted by score
 - C/C++ language support: regular string literals (with `L`/`u`/`U`/`u8` prefixes), raw string literals (`R"(...)"`), escape sequences, and concatenated strings (including with comments between parts) — all via the `tree-sitter-cpp` grammar
 - CI workflow now packages and uploads the `.vsix` as a build artifact

@@ -107,6 +107,11 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			excludeGlob: message.excludeGlob || undefined,
 			token,
 			fileUris,
+			onProgress: (parsed, total) => {
+				if (!token.isCancellationRequested) {
+					this.postMessage({ type: "progress", parsed, total });
+				}
+			},
 		})
 			.then(({ results: allResults, timings }) => {
 				if (token.isCancellationRequested) return;
@@ -536,6 +541,8 @@ function getWebviewHtml(defaultCutoff: number): string {
 			statusEl.textContent = 'Searching…';
 			timingsEl.textContent = '';
 			resultsEl.innerHTML = '';
+		} else if (message.type === 'progress') {
+			statusEl.textContent = 'Collecting strings ' + message.parsed + '/' + message.total + ' files';
 		} else if (message.type === 'results') {
 			renderResults(message.results);
 			renderTimings(message.timings);

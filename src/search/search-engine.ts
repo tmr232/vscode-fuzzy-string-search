@@ -42,6 +42,8 @@ export interface SearchOptions {
 	token?: vscode.CancellationToken;
 	/** Restrict search to a specific set of file URIs instead of discovering files. */
 	fileUris?: vscode.Uri[];
+	/** Called after each file is parsed during the collect phase. */
+	onProgress?: (parsed: number, total: number) => void;
 }
 
 /**
@@ -153,9 +155,15 @@ export async function search(
 	const allResults: MatchResult[] = [];
 	const allStrings: SourceString[] = [];
 
+	let parsed = 0;
+	const onProgress = options?.onProgress;
+	const totalFiles = files.length;
+
 	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
 		const strings = await getStringsForFile(uri, cache, wasmDir);
+		parsed++;
+		onProgress?.(parsed, totalFiles);
 		if (!strings || strings.length === 0) return;
 		allStrings.push(...strings);
 	});
