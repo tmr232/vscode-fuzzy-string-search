@@ -1,11 +1,36 @@
 import * as vscode from "vscode";
+import { PersistentCache } from "./cache/persistent-cache.js";
 import { StringCache } from "./cache/string-cache.js";
 import { getAllLanguages } from "./languages/registry.js";
 import { SearchPanelProvider, VIEW_ID } from "./views/search-panel.js";
 
 export const stringCache = new StringCache();
+let persistentCache: PersistentCache | undefined;
+
+function getWorkspaceFolderUris(): string[] {
+	return (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.toString());
+}
 
 export function activate(context: vscode.ExtensionContext): void {
+	// Set up persistent cache
+	persistentCache = new PersistentCache(context.globalStorageUri.fsPath);
+
+	// Load persisted cache in the background (non-blocking)
+	const folderUris = getWorkspaceFolderUris();
+	persistentCache.load(stringCache, folderUris).then(
+		(loaded) => {
+			if (loaded > 0) {
+				console.log(`[Fuzzy String Search] Restored ${loaded} files from persistent cache`);
+			}
+		},
+		(err) => {
+			console.warn("[Fuzzy String Search] Failed to load persistent cache:", err);
+		},
+	);
+
+	// Prune stale cache files in the background
+	persistentCache.pruneStale().catch(() => {});
+
 	// Register the search panel webview
 	const searchPanelProvider = new SearchPanelProvider(context.extensionUri, stringCache);
 	context.subscriptions.push(
@@ -55,5 +80,12 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
+	if (persistentCache) {
+		const folderUris = getWorkspaceFolderUris();
+		// Save is fire-and-forget — VS Code allows a short grace period for deactivation
+		persistentCache.save(stringCache, folderUris).catch((err) => {
+			console.warn("[Fuzzy String Search] Failed to save persistent cache:", err);
+		});
+	}
 	stringCache.clear();
 }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type * as vscode from "vscode";
@@ -88,7 +89,8 @@ async function getStringsForFile(
 	}
 
 	const strings = collectStrings(source, filePath, parser, langSupport);
-	cache.set(uriString, strings);
+	const contentHash = createHash("sha256").update(source).digest("hex");
+	cache.set(uriString, strings, contentHash);
 	return strings;
 }
 
