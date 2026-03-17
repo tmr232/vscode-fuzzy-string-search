@@ -160,8 +160,13 @@ export async function search(
 	const scoreCutoff = options?.scoreCutoff ?? DEFAULT_SCORE_CUTOFF;
 	const maxResults = options?.maxResults ?? DEFAULT_MAX_RESULTS;
 	const token = options?.token;
+	const logger = options?.logger;
 
 	if (token?.isCancellationRequested) return emptyResult;
+
+	logger?.appendLine(
+		`Search started: query="${query}", scoreCutoff=${scoreCutoff}, maxResults=${maxResults}`,
+	);
 
 	const toSec = (ms: number) => ms / 1000;
 	const totalStart = performance.now();
@@ -180,28 +185,37 @@ export async function search(
 	const discoverySec = toSec(performance.now() - discoveryStart);
 	if (token?.isCancellationRequested) return emptyResult;
 
+	logger?.appendLine(`Discovery: ${files.length} files found in ${discoverySec.toFixed(2)}s`);
+
 	const allResults: MatchResult[] = [];
 	const allStrings: SourceString[] = [];
 
 	let parsed = 0;
+	let cachedFiles = 0;
 	const onProgress = options?.onProgress;
 	const totalFiles = files.length;
 
 	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
+		const wasCached = cache.get(uri.toString()) !== undefined;
 		const strings = await getStringsForFile(
 			uri,
 			cache,
 			wasmDir,
 			options?.enabledLanguageIds,
-			options?.logger,
+			logger,
 		);
 		parsed++;
+		if (wasCached) cachedFiles++;
 		onProgress?.(parsed, totalFiles);
 		if (!strings || strings.length === 0) return;
 		allStrings.push(...strings);
 	});
 	const collectSec = toSec(performance.now() - collectStart);
+
+	logger?.appendLine(
+		`Collection: ${allStrings.length} strings from ${parsed} files (${cachedFiles} from cache) in ${collectSec.toFixed(2)}s`,
+	);
 
 	const matchStart = performance.now();
 	if (allStrings.length > 0) {
@@ -219,6 +233,10 @@ export async function search(
 		maxResults > 0 && allResults.length > maxResults ? allResults.slice(0, maxResults) : allResults;
 
 	const totalSec = toSec(performance.now() - totalStart);
+
+	logger?.appendLine(
+		`Matching: ${allResults.length} matches (returning ${results.length}) in ${matchSec.toFixed(2)}s — total ${totalSec.toFixed(2)}s`,
+	);
 
 	return {
 		results,

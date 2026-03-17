@@ -15,6 +15,9 @@ function getWorkspaceFolderUris(): string[] {
 export function activate(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(outputChannel);
 
+	const registeredLanguages = getAllLanguages().map((l) => l.languageId);
+	outputChannel.appendLine(`Activating — registered languages: ${registeredLanguages.join(", ")}`);
+
 	// Set up persistent cache
 	persistentCache = new PersistentCache(context.globalStorageUri.fsPath);
 
@@ -48,6 +51,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// Invalidate cache when a document is saved (covers both internal edits and external tools that trigger a save)
 	context.subscriptions.push(
 		vscode.workspace.onDidSaveTextDocument((document) => {
+			outputChannel.appendLine(`Cache invalidated (save): ${document.uri.fsPath}`);
 			stringCache.invalidate(document.uri.toString());
 		}),
 	);
@@ -56,6 +60,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
 		vscode.workspace.onDidDeleteFiles((event) => {
 			for (const uri of event.files) {
+				outputChannel.appendLine(`Cache invalidated (delete): ${uri.fsPath}`);
 				stringCache.invalidate(uri.toString());
 			}
 		}),
@@ -73,6 +78,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		const watcher = vscode.workspace.createFileSystemWatcher(globPattern);
 
 		watcher.onDidChange((uri) => {
+			outputChannel.appendLine(`Cache invalidated (external change): ${uri.fsPath}`);
 			stringCache.invalidate(uri.toString());
 		});
 		watcher.onDidDelete((uri) => {

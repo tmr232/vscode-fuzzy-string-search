@@ -98,6 +98,9 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			} else if (message.type === "openFile") {
 				this.handleOpenFile(message);
 			} else if (message.type === "setLanguages") {
+				this.outputChannel.appendLine(
+					`Languages changed: ${message.enabledLanguageIds.join(", ")}`,
+				);
 				this.workspaceState.update(ENABLED_LANGUAGES_KEY, message.enabledLanguageIds);
 			}
 		});
