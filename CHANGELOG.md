@@ -16,6 +16,10 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 
 ### Added
 
+- TypeScript/TSX language support: single/double-quoted strings and template literals (interpolation → `{}`), escape sequences — via the `tree-sitter-typescript` grammar
+- JavaScript/JSX language support: same string handling as TypeScript, using the TypeScript grammar (which is a superset)
+- Language selector in the search panel: collapsible "⋯ languages" section with per-language checkboxes to control which languages are searched; selection is persisted per workspace via `workspaceState`
+- New languages added in future updates are enabled by default
 - Persistent string cache: parsed strings are saved to disk on deactivation and restored on startup, eliminating the slow first-search penalty after editor restarts (files are validated by content hash to ensure correctness)
 - Parsing progress indicator: shows "Collecting strings x/n files" in the status area while files are being parsed
 - "Group by file" checkbox in the search panel — when checked, results are grouped under file headers; when unchecked (default), results are shown as a flat list sorted by score

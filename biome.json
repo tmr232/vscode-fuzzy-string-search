@@ -13,6 +13,6 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!**/out", "!**/node_modules", "!**/wasm", "!**/*.wasm"]
+		"includes": ["**", "!**/out", "!**/node_modules", "!**/wasm", "!**/*.wasm", "!test/fixtures"]
 	}
 }

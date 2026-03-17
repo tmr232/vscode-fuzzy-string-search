@@ -23,8 +23,15 @@ Think of it as "grep for string contents" — but fuzzy, so typos and partial ma
 | Language | File Extensions | String Types |
 |----------|----------------|--------------|
 | Python   | `.py`, `.pyi`  | Single/double/triple-quoted, f-strings (interpolation → `{}`), raw strings, byte strings, concatenated strings |
+| C/C++    | `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.hh` | String literals (with `L`/`u`/`U`/`u8` prefixes), raw string literals, escape sequences, concatenated strings |
+| TypeScript | `.ts`, `.mts`, `.cts` | Single/double-quoted strings, template literals (interpolation → `{}`), escape sequences |
+| TSX      | `.tsx`         | Same as TypeScript, plus JSX contexts |
+| JavaScript | `.js`, `.mjs`, `.cjs` | Same as TypeScript |
+| JSX      | `.jsx`         | Same as TSX |
 
-More languages coming soon. The architecture is pluggable — see [Contributing](#contributing).
+Use the **⋯ languages** toggle in the search panel to select which languages to include in searches. The selection is persisted per workspace.
+
+The architecture is pluggable — see [Contributing](#contributing).
 
 ## Usage
 
@@ -34,6 +41,8 @@ More languages coming soon. The architecture is pluggable — see [Contributing]
 4. Click any result to jump to that string in the source file
 
 ### Filters
+
+Click **⋯ languages** to choose which languages to search. The selection is saved per workspace.
 
 Click **⋯ filters** below the search box to access:
 

@@ -23,6 +23,14 @@ const LANGUAGE_MAP: Record<string, LanguageMapping> = {
 		npmPackage: "tree-sitter-cpp",
 		wasmFile: "tree-sitter-cpp.wasm",
 	},
+	typescript: {
+		npmPackage: "tree-sitter-typescript",
+		wasmFile: "tree-sitter-typescript.wasm",
+	},
+	tsx: {
+		npmPackage: "tree-sitter-typescript",
+		wasmFile: "tree-sitter-tsx.wasm",
+	},
 };
 
 const WASM_DIR = resolve(dirname(import.meta.dirname), "wasm");

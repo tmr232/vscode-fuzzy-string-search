@@ -32,7 +32,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	persistentCache.pruneStale().catch(() => {});
 
 	// Register the search panel webview
-	const searchPanelProvider = new SearchPanelProvider(context.extensionUri, stringCache);
+	const searchPanelProvider = new SearchPanelProvider(
+		context.extensionUri,
+		stringCache,
+		context.workspaceState,
+	);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(VIEW_ID, searchPanelProvider),
 	);

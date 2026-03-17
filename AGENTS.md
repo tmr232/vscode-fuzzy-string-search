@@ -45,7 +45,8 @@ A VSCode extension ("Fuzzy String Search") that fuzzy-matches user queries again
 ### Architecture
 - **Language support is pluggable**: each language implements the `LanguageSupport` interface and is registered in `src/languages/registry.ts`.
 - Adding a new language should require only: (1) a new file in `src/languages/`, (2) registering it in the registry, (3) downloading the `.wasm` file.
-- MVP supports **Python only**; code must be structured for easy extension.
+- Currently supports **Python**, **C/C++**, **TypeScript/TSX**, and **JavaScript/JSX**.
+- The search panel has a per-workspace language selector (persisted via `workspaceState`).
 
 ### File Layout
 ```
@@ -56,6 +57,8 @@ src/
     language-support.ts     # LanguageSupport interface
     registry.ts             # Language registry (single registration point)
     python.ts               # Python implementation
+    cpp.ts                  # C/C++ implementation
+    typescript.ts           # TypeScript/TSX/JavaScript/JSX implementation
   parsing/
     parser-manager.ts       # Tree-sitter init & language loading
     string-collector.ts     # Tree traversal → SourceString[]

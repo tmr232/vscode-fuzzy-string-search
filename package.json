@@ -61,7 +61,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"download-wasm": "bun run scripts/download-wasm.ts",
-		"lint": "biome check . && oxlint",
+		"lint": "biome check . && oxlint --ignore-pattern test/fixtures",
 		"lint:fix": "biome check --fix .",
 		"format": "biome format --write .",
 		"vscode:prepublish": "bun run download-wasm && bun run build",
@@ -81,6 +81,7 @@
 		"fuzzball": "^2.2.3",
 		"tree-sitter-cpp": "^0.23.4",
 		"tree-sitter-python": "^0.25.0",
+		"tree-sitter-typescript": "^0.23.2",
 		"web-tree-sitter": "^0.26.6"
 	}
 }

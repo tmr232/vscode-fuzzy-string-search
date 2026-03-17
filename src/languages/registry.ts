@@ -1,6 +1,12 @@
 import { cppLanguageSupport } from "./cpp.js";
 import type { LanguageSupport } from "./language-support.js";
 import { pythonLanguageSupport } from "./python.js";
+import {
+	javascriptLanguageSupport,
+	jsxLanguageSupport,
+	tsxLanguageSupport,
+	typescriptLanguageSupport,
+} from "./typescript.js";
 
 const languagesById = new Map<string, LanguageSupport>();
 const languagesByExtension = new Map<string, LanguageSupport>();
@@ -19,6 +25,10 @@ function register(lang: LanguageSupport): void {
 // Register all supported languages
 register(pythonLanguageSupport);
 register(cppLanguageSupport);
+register(typescriptLanguageSupport);
+register(tsxLanguageSupport);
+register(javascriptLanguageSupport);
+register(jsxLanguageSupport);
 
 /**
  * Look up language support by file path (using its extension).

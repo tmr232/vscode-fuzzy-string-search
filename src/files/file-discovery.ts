@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
+import type { LanguageSupport } from "../languages/language-support.js";
 import { getAllLanguages } from "../languages/registry.js";
 
 /**
- * Build a glob include pattern matching all file extensions for supported languages.
+ * Build a glob include pattern matching all file extensions for the given languages.
  */
-function buildIncludePattern(): string {
-	const extensions = getAllLanguages().flatMap((lang) =>
+function buildIncludePattern(languages: LanguageSupport[]): string {
+	const extensions = languages.flatMap((lang) =>
 		lang.fileExtensions.map((ext) => ext.replace(/^\./, "")),
 	);
 	if (extensions.length === 0) return "";
@@ -22,14 +23,20 @@ function buildIncludePattern(): string {
  *   pattern derived from registered language extensions).
  * @param exclude - Optional glob pattern to exclude files.
  * @param token - Optional cancellation token.
+ * @param enabledLanguageIds - Optional set of language IDs to restrict discovery to.
+ *   If not provided, all registered languages are used.
  * @returns Array of file URIs for supported files.
  */
 export async function discoverFiles(
 	include?: string,
 	exclude?: string,
 	token?: vscode.CancellationToken,
+	enabledLanguageIds?: string[],
 ): Promise<vscode.Uri[]> {
-	const includePattern = include ?? buildIncludePattern();
+	const languages = enabledLanguageIds
+		? getAllLanguages().filter((lang) => enabledLanguageIds.includes(lang.languageId))
+		: getAllLanguages();
+	const includePattern = include ?? buildIncludePattern(languages);
 	if (includePattern === "") return [];
 
 	const excludePattern = exclude ?? undefined;

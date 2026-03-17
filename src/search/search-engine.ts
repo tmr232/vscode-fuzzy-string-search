@@ -43,6 +43,8 @@ export interface SearchOptions {
 	token?: vscode.CancellationToken;
 	/** Restrict search to a specific set of file URIs instead of discovering files. */
 	fileUris?: vscode.Uri[];
+	/** Restrict search to specific language IDs (e.g. ["python", "typescript"]). */
+	enabledLanguageIds?: string[];
 	/** Called after each file is parsed during the collect phase. */
 	onProgress?: (parsed: number, total: number) => void;
 }
@@ -68,6 +70,7 @@ async function getStringsForFile(
 	uri: vscode.Uri,
 	cache: StringCache,
 	wasmDir: string,
+	enabledLanguageIds?: string[],
 ): Promise<SourceString[] | undefined> {
 	const uriString = uri.toString();
 	const cached = cache.get(uriString);
@@ -76,6 +79,7 @@ async function getStringsForFile(
 	const filePath = uri.fsPath;
 	const langSupport = getLanguageForFile(filePath);
 	if (!langSupport) return undefined;
+	if (enabledLanguageIds && !enabledLanguageIds.includes(langSupport.languageId)) return undefined;
 
 	const wasmPath = join(wasmDir, langSupport.wasmFileName);
 	const language = await loadLanguage(wasmPath);
@@ -150,7 +154,13 @@ export async function search(
 
 	const discoveryStart = performance.now();
 	const files =
-		options?.fileUris ?? (await discoverFiles(options?.includeGlob, options?.excludeGlob, token));
+		options?.fileUris ??
+		(await discoverFiles(
+			options?.includeGlob,
+			options?.excludeGlob,
+			token,
+			options?.enabledLanguageIds,
+		));
 	const discoverySec = toSec(performance.now() - discoveryStart);
 	if (token?.isCancellationRequested) return emptyResult;
 
@@ -163,7 +173,7 @@ export async function search(
 
 	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
-		const strings = await getStringsForFile(uri, cache, wasmDir);
+		const strings = await getStringsForFile(uri, cache, wasmDir, options?.enabledLanguageIds);
 		parsed++;
 		onProgress?.(parsed, totalFiles);
 		if (!strings || strings.length === 0) return;

@@ -189,6 +189,6 @@ describe("search", () => {
 			excludeGlob: "**/test/**",
 		});
 
-		expect(discoverFilesMock).toHaveBeenCalledWith("**/*.py", "**/test/**", undefined);
+		expect(discoverFilesMock).toHaveBeenCalledWith("**/*.py", "**/test/**", undefined, undefined);
 	});
 });

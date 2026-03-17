@@ -1,13 +1,13 @@
 import { join, relative } from "node:path";
 import * as vscode from "vscode";
 import type { StringCache } from "../cache/string-cache.js";
+import { getAllLanguages } from "../languages/registry.js";
 import {
 	contentOffsetToPosition,
 	findAlignment,
 	formatAlignedMatch,
 } from "../matching/alignment.js";
 import type { MatchResult } from "../matching/fuzzy-matcher.js";
-import type { SearchTimings } from "../search/search-engine.js";
 import { search } from "../search/search-engine.js";
 
 export const VIEW_ID = "fuzzyStringSearch.searchPanel";
@@ -20,6 +20,7 @@ interface SearchMessage {
 	includeGlob: string;
 	excludeGlob: string;
 	currentFileOnly: boolean;
+	enabledLanguageIds: string[];
 }
 
 interface OpenFileMessage {
@@ -31,7 +32,14 @@ interface OpenFileMessage {
 	endColumn: number;
 }
 
-type IncomingMessage = SearchMessage | OpenFileMessage;
+interface SetLanguagesMessage {
+	type: "setLanguages";
+	enabledLanguageIds: string[];
+}
+
+type IncomingMessage = SearchMessage | OpenFileMessage | SetLanguagesMessage;
+
+const ENABLED_LANGUAGES_KEY = "fuzzyStringSearch.enabledLanguageIds";
 
 export class SearchPanelProvider implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
@@ -40,7 +48,26 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 	constructor(
 		private readonly extensionUri: vscode.Uri,
 		private readonly cache: StringCache,
+		private readonly workspaceState: vscode.Memento,
 	) {}
+
+	/**
+	 * Get the list of enabled language IDs from workspace state.
+	 * Defaults to all registered languages if not previously set.
+	 */
+	private getEnabledLanguageIds(): string[] {
+		const allIds = getAllLanguages().map((l) => l.languageId);
+		const stored = this.workspaceState.get<string[]>(ENABLED_LANGUAGES_KEY);
+		if (!stored) return allIds;
+		// Include any newly registered languages not yet in the stored list
+		const storedSet = new Set(stored);
+		for (const id of allIds) {
+			if (!storedSet.has(id)) {
+				stored.push(id);
+			}
+		}
+		return stored;
+	}
 
 	resolveWebviewView(
 		webviewView: vscode.WebviewView,
@@ -57,13 +84,20 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 		const defaultCutoff = config.get<number>("defaultScoreCutoff", 60);
 		const maxResults = config.get<number>("maxResults", 100);
 
-		webviewView.webview.html = getWebviewHtml(defaultCutoff);
+		const allLanguages = getAllLanguages().map((l) => ({
+			id: l.languageId,
+			enabled: this.getEnabledLanguageIds().includes(l.languageId),
+		}));
+
+		webviewView.webview.html = getWebviewHtml(defaultCutoff, allLanguages);
 
 		webviewView.webview.onDidReceiveMessage((message: IncomingMessage) => {
 			if (message.type === "search") {
 				this.handleSearch(message, maxResults);
 			} else if (message.type === "openFile") {
 				this.handleOpenFile(message);
+			} else if (message.type === "setLanguages") {
+				this.workspaceState.update(ENABLED_LANGUAGES_KEY, message.enabledLanguageIds);
 			}
 		});
 	}
@@ -105,6 +139,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			maxResults,
 			includeGlob: message.includeGlob || undefined,
 			excludeGlob: message.excludeGlob || undefined,
+			enabledLanguageIds: message.enabledLanguageIds,
 			token,
 			fileUris,
 			onProgress: (parsed, total) => {
@@ -208,7 +243,21 @@ function formatResults(
 	});
 }
 
-function getWebviewHtml(defaultCutoff: number): string {
+interface LanguageInfo {
+	id: string;
+	enabled: boolean;
+}
+
+function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): string {
+	const languageCheckboxes = languages
+		.map(
+			(l) =>
+				`<div class="checkbox-group">
+			<input type="checkbox" class="lang-checkbox" data-lang-id="${l.id}" ${l.enabled ? "checked" : ""} />
+			<label>${l.id}</label>
+		</div>`,
+		)
+		.join("\n\t\t");
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -356,6 +405,10 @@ function getWebviewHtml(defaultCutoff: number): string {
 		<input type="checkbox" id="groupByFile" />
 		<label for="groupByFile">Group by file</label>
 	</div>
+	<span class="toggle-link" id="toggleLanguages">⋯ languages</span>
+	<div class="advanced" id="languagesSection">
+		${languageCheckboxes}
+	</div>
 	<span class="toggle-link" id="toggleAdvanced">⋯ filters</span>
 	<div class="advanced" id="advancedSection">
 		<div class="input-group">
@@ -393,10 +446,19 @@ function getWebviewHtml(defaultCutoff: number): string {
 	const resultsEl = document.getElementById('results');
 	const toggleAdvanced = document.getElementById('toggleAdvanced');
 	const advancedSection = document.getElementById('advancedSection');
+	const toggleLanguages = document.getElementById('toggleLanguages');
+	const languagesSection = document.getElementById('languagesSection');
+	const langCheckboxes = document.querySelectorAll('.lang-checkbox');
 
 	let debounceTimer = null;
 	
 	const DEBOUNCE_MS = 300;
+
+	function getEnabledLanguageIds() {
+		return Array.from(langCheckboxes)
+			.filter(cb => cb.checked)
+			.map(cb => cb.dataset.langId);
+	}
 
 	// Restore persisted state
 	const savedState = vscode.getState();
@@ -414,6 +476,12 @@ function getWebviewHtml(defaultCutoff: number): string {
 		if (savedState.timings) {
 			renderTimings(savedState.timings);
 		}
+		if (savedState.enabledLanguageIds) {
+			const enabled = new Set(savedState.enabledLanguageIds);
+			for (const cb of langCheckboxes) {
+				cb.checked = enabled.has(cb.dataset.langId);
+			}
+		}
 	}
 
 	function saveState(results, timings) {
@@ -425,10 +493,18 @@ function getWebviewHtml(defaultCutoff: number): string {
 			excludeGlob: excludeGlobInput.value,
 			currentFileOnly: currentFileOnlyInput.checked,
 			groupByFile: groupByFileInput.checked,
+			enabledLanguageIds: getEnabledLanguageIds(),
 			results: results || [],
 			timings: timings || null,
 		});
 	}
+
+	toggleLanguages.addEventListener('click', () => {
+		languagesSection.classList.toggle('visible');
+		toggleLanguages.textContent = languagesSection.classList.contains('visible')
+			? '⋯ hide languages'
+			: '⋯ languages';
+	});
 
 	toggleAdvanced.addEventListener('click', () => {
 		advancedSection.classList.toggle('visible');
@@ -440,6 +516,7 @@ function getWebviewHtml(defaultCutoff: number): string {
 	function triggerSearch() {
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
+			const enabledLanguageIds = getEnabledLanguageIds();
 			vscode.postMessage({
 				type: 'search',
 				query: queryInput.value,
@@ -448,6 +525,11 @@ function getWebviewHtml(defaultCutoff: number): string {
 				includeGlob: includeGlobInput.value,
 				excludeGlob: excludeGlobInput.value,
 				currentFileOnly: currentFileOnlyInput.checked,
+				enabledLanguageIds,
+			});
+			vscode.postMessage({
+				type: 'setLanguages',
+				enabledLanguageIds,
 			});
 		}, DEBOUNCE_MS);
 	}
@@ -458,6 +540,9 @@ function getWebviewHtml(defaultCutoff: number): string {
 	includeGlobInput.addEventListener('input', triggerSearch);
 	excludeGlobInput.addEventListener('input', triggerSearch);
 	currentFileOnlyInput.addEventListener('change', triggerSearch);
+	for (const cb of langCheckboxes) {
+		cb.addEventListener('change', triggerSearch);
+	}
 	groupByFileInput.addEventListener('change', () => {
 		const state = vscode.getState();
 		if (state && state.results && state.results.length > 0) {
