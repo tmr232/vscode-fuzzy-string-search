@@ -49,6 +49,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 		private readonly extensionUri: vscode.Uri,
 		private readonly cache: StringCache,
 		private readonly workspaceState: vscode.Memento,
+		private readonly outputChannel: vscode.OutputChannel,
 	) {}
 
 	/**
@@ -142,6 +143,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			enabledLanguageIds: message.enabledLanguageIds,
 			token,
 			fileUris,
+			logger: this.outputChannel,
 			onProgress: (parsed, total) => {
 				if (!token.isCancellationRequested) {
 					this.postMessage({ type: "progress", parsed, total });
@@ -159,6 +161,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			.catch((err: unknown) => {
 				if (token.isCancellationRequested) return;
 				const errorMessage = err instanceof Error ? err.message : String(err);
+				this.outputChannel.appendLine(`Search error: ${errorMessage}`);
 				this.postMessage({ type: "error", message: errorMessage });
 			});
 	}

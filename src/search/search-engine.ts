@@ -26,6 +26,13 @@ export interface SearchTimings {
 }
 
 /**
+ * Logger interface for the search engine.
+ */
+export interface SearchLogger {
+	appendLine(message: string): void;
+}
+
+/**
  * Options for a search operation.
  */
 export interface SearchOptions {
@@ -47,6 +54,8 @@ export interface SearchOptions {
 	enabledLanguageIds?: string[];
 	/** Called after each file is parsed during the collect phase. */
 	onProgress?: (parsed: number, total: number) => void;
+	/** Logger for errors and warnings (e.g. a VSCode OutputChannel). */
+	logger?: SearchLogger;
 }
 
 /**
@@ -71,6 +80,7 @@ async function getStringsForFile(
 	cache: StringCache,
 	wasmDir: string,
 	enabledLanguageIds?: string[],
+	logger?: SearchLogger,
 ): Promise<SourceString[] | undefined> {
 	const uriString = uri.toString();
 	const cached = cache.get(uriString);
@@ -82,8 +92,6 @@ async function getStringsForFile(
 	if (enabledLanguageIds && !enabledLanguageIds.includes(langSupport.languageId)) return undefined;
 
 	const wasmPath = join(wasmDir, langSupport.wasmFileName);
-	const language = await loadLanguage(wasmPath);
-	const parser = createParser(language);
 
 	let source: string;
 	try {
@@ -92,10 +100,18 @@ async function getStringsForFile(
 		return undefined;
 	}
 
-	const strings = collectStrings(source, filePath, parser, langSupport);
-	const contentHash = createHash("sha256").update(source).digest("hex");
-	cache.set(uriString, strings, contentHash);
-	return strings;
+	try {
+		const language = await loadLanguage(wasmPath);
+		const parser = createParser(language);
+		const strings = collectStrings(source, filePath, parser, langSupport);
+		const contentHash = createHash("sha256").update(source).digest("hex");
+		cache.set(uriString, strings, contentHash);
+		return strings;
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		logger?.appendLine(`Failed to parse ${filePath}: ${message}`);
+		return undefined;
+	}
 }
 
 /**
@@ -173,7 +189,13 @@ export async function search(
 
 	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
-		const strings = await getStringsForFile(uri, cache, wasmDir, options?.enabledLanguageIds);
+		const strings = await getStringsForFile(
+			uri,
+			cache,
+			wasmDir,
+			options?.enabledLanguageIds,
+			options?.logger,
+		);
 		parsed++;
 		onProgress?.(parsed, totalFiles);
 		if (!strings || strings.length === 0) return;
