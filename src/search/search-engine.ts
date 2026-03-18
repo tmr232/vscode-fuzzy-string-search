@@ -100,6 +100,9 @@ async function getStringsForFile(
 	const cached = cache.get(uriString);
 	if (cached) return { strings: cached };
 
+	const failedLang = cache.getFailed(uriString);
+	if (failedLang) return { failedLanguageId: failedLang };
+
 	const filePath = uri.fsPath;
 	const langSupport = getLanguageForFile(filePath);
 	if (!langSupport) return {};
@@ -111,6 +114,7 @@ async function getStringsForFile(
 	try {
 		source = await readFile(filePath, "utf-8");
 	} catch {
+		cache.setFailed(uriString, langSupport.languageId);
 		return { failedLanguageId: langSupport.languageId };
 	}
 
@@ -124,6 +128,7 @@ async function getStringsForFile(
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
 		logger?.appendLine(`Failed to parse ${filePath}: ${message}`);
+		cache.setFailed(uriString, langSupport.languageId);
 		return { failedLanguageId: langSupport.languageId };
 	}
 }

@@ -18,6 +18,11 @@ export interface CacheEntry {
  */
 export class StringCache {
 	private readonly cache = new Map<string, CacheEntry>();
+	/**
+	 * URIs that failed to parse, mapped to their language ID.
+	 * Kept only in memory — never persisted to disk.
+	 */
+	private readonly failedUris = new Map<string, string>();
 	private _dirty = false;
 
 	/**
@@ -63,16 +68,33 @@ export class StringCache {
 	 * Returns `true` if an entry was removed, `false` if no entry existed.
 	 */
 	invalidate(uri: string): boolean {
+		this.failedUris.delete(uri);
 		const deleted = this.cache.delete(uri);
 		if (deleted) this._dirty = true;
 		return deleted;
 	}
 
 	/**
-	 * Clear all cached entries.
+	 * Record that a file URI failed to parse.
+	 * This is kept in memory only and never persisted.
+	 */
+	setFailed(uri: string, languageId: string): void {
+		this.failedUris.set(uri, languageId);
+	}
+
+	/**
+	 * Get the language ID of a previously failed parse, or `undefined` if not failed.
+	 */
+	getFailed(uri: string): string | undefined {
+		return this.failedUris.get(uri);
+	}
+
+	/**
+	 * Clear all cached entries (including failed URIs).
 	 */
 	clear(): void {
 		this.cache.clear();
+		this.failedUris.clear();
 	}
 
 	/**

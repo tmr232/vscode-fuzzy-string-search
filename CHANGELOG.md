@@ -16,6 +16,7 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 ### Fixed
 
 - Fix search becoming unresponsive after upgrading from a version that used millisecond timings — stale persisted state with old field names crashed the webview script before event listeners were registered
+- Files that fail to read or parse are now remembered in the in-memory cache so they are not retried on subsequent searches (failed entries are not persisted to disk)
 
 ### Added
 
