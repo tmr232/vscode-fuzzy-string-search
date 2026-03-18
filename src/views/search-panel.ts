@@ -1,6 +1,7 @@
 import { join, relative } from "node:path";
 import * as vscode from "vscode";
 import type { StringCache } from "../cache/string-cache.js";
+import { countFilesByLanguage } from "../files/file-discovery.js";
 import { getAllLanguages } from "../languages/registry.js";
 import {
 	contentOffsetToPosition,
@@ -37,7 +38,15 @@ interface SetLanguagesMessage {
 	enabledLanguageIds: string[];
 }
 
-type IncomingMessage = SearchMessage | OpenFileMessage | SetLanguagesMessage;
+interface RequestFileCountsMessage {
+	type: "requestFileCounts";
+}
+
+type IncomingMessage =
+	| SearchMessage
+	| OpenFileMessage
+	| SetLanguagesMessage
+	| RequestFileCountsMessage;
 
 const ENABLED_LANGUAGES_KEY = "fuzzyStringSearch.enabledLanguageIds";
 
@@ -103,8 +112,19 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 					`Languages changed: ${message.enabledLanguageIds.join(", ")}`,
 				);
 				this.workspaceState.update(ENABLED_LANGUAGES_KEY, message.enabledLanguageIds);
+			} else if (message.type === "requestFileCounts") {
+				this.sendFileCounts();
 			}
 		});
+	}
+
+	private async sendFileCounts(): Promise<void> {
+		const counts = await countFilesByLanguage();
+		const fileCounts: Record<string, number> = {};
+		for (const [id, count] of counts) {
+			fileCounts[id] = count;
+		}
+		this.postMessage({ type: "fileCounts", fileCounts });
 	}
 
 	private handleSearch(message: SearchMessage, maxResults: number): void {
@@ -262,7 +282,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 			(l) =>
 				`<div class="checkbox-group">
 			<input type="checkbox" class="lang-checkbox" data-lang-id="${l.id}" ${l.enabled ? "checked" : ""} />
-			<label>${l.id}</label>
+			<label>${l.id} <span class="lang-count" data-count-id="${l.id}"></span></label>
 		</div>`,
 		)
 		.join("\n\t\t");
@@ -350,6 +370,9 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 		font-size: 11px;
 		color: var(--vscode-descriptionForeground);
 		cursor: pointer;
+	}
+	.lang-count {
+		opacity: 0.7;
 	}
 	.status {
 		font-size: 11px;
@@ -507,11 +530,16 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 		});
 	}
 
+	let fileCountsRequested = false;
 	toggleLanguages.addEventListener('click', () => {
 		languagesSection.classList.toggle('visible');
 		toggleLanguages.textContent = languagesSection.classList.contains('visible')
 			? '⋯ hide languages'
 			: '⋯ languages';
+		if (languagesSection.classList.contains('visible') && !fileCountsRequested) {
+			fileCountsRequested = true;
+			vscode.postMessage({ type: 'requestFileCounts' });
+		}
 	});
 
 	toggleAdvanced.addEventListener('click', () => {
@@ -644,6 +672,11 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 			statusEl.textContent = 'Error: ' + message.message;
 			timingsEl.textContent = '';
 			resultsEl.innerHTML = '';
+		} else if (message.type === 'fileCounts') {
+			for (const [langId, count] of Object.entries(message.fileCounts)) {
+				const span = document.querySelector('.lang-count[data-count-id="' + langId + '"]');
+				if (span) span.textContent = '(' + count + ')';
+			}
 		}
 	});
 </script>

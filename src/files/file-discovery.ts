@@ -43,3 +43,35 @@ export async function discoverFiles(
 
 	return vscode.workspace.findFiles(includePattern, excludePattern, undefined, token);
 }
+
+/**
+ * Count workspace files per registered language.
+ *
+ * Discovers all supported files once, then buckets each file by its language
+ * based on file extension.
+ *
+ * @returns A map from language ID to the number of matching workspace files.
+ */
+export async function countFilesByLanguage(
+	token?: vscode.CancellationToken,
+): Promise<Map<string, number>> {
+	const allLangs = getAllLanguages();
+	const counts = new Map<string, number>();
+	for (const lang of allLangs) {
+		counts.set(lang.languageId, 0);
+	}
+
+	const files = await discoverFiles(undefined, undefined, token);
+	for (const uri of files) {
+		const dotIndex = uri.fsPath.lastIndexOf(".");
+		if (dotIndex === -1) continue;
+		const ext = uri.fsPath.slice(dotIndex).toLowerCase();
+		for (const lang of allLangs) {
+			if (lang.fileExtensions.includes(ext)) {
+				counts.set(lang.languageId, (counts.get(lang.languageId) ?? 0) + 1);
+				break;
+			}
+		}
+	}
+	return counts;
+}
