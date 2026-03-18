@@ -50,6 +50,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 		private readonly cache: StringCache,
 		private readonly workspaceState: vscode.Memento,
 		private readonly outputChannel: vscode.OutputChannel,
+		private readonly onSearchComplete?: () => void,
 	) {}
 
 	/**
@@ -160,6 +161,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 					results: formatResults(allResults, workspaceRoot, query),
 					timings,
 				});
+				this.onSearchComplete?.();
 			})
 			.catch((err: unknown) => {
 				if (token.isCancellationRequested) return;

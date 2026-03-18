@@ -7,9 +7,29 @@ import { SearchPanelProvider, VIEW_ID } from "./views/search-panel.js";
 export const stringCache = new StringCache();
 export const outputChannel = vscode.window.createOutputChannel("Fuzzy String Search");
 let persistentCache: PersistentCache | undefined;
+let saveInterval: ReturnType<typeof setInterval> | undefined;
+let hasPerformedInitialSave = false;
+
+/**
+ * Interval (in milliseconds) between periodic cache saves.
+ */
+const SAVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 function getWorkspaceFolderUris(): string[] {
 	return (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.toString());
+}
+
+/**
+ * Save the persistent cache if the in-memory cache has been modified.
+ */
+async function saveIfDirty(): Promise<void> {
+	if (!persistentCache || !stringCache.dirty) return;
+	const folderUris = getWorkspaceFolderUris();
+	try {
+		await persistentCache.save(stringCache, folderUris);
+	} catch (err) {
+		outputChannel.appendLine(`Failed to save persistent cache: ${err}`);
+	}
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -19,23 +39,21 @@ export function activate(context: vscode.ExtensionContext): void {
 	outputChannel.appendLine(`Activating — registered languages: ${registeredLanguages.join(", ")}`);
 
 	// Set up persistent cache
-	persistentCache = new PersistentCache(context.globalStorageUri.fsPath);
+	persistentCache = new PersistentCache(context.globalStorageUri.fsPath, outputChannel);
 
 	// Load persisted cache in the background (non-blocking)
 	const folderUris = getWorkspaceFolderUris();
-	persistentCache.load(stringCache, folderUris).then(
-		(loaded) => {
-			if (loaded > 0) {
-				outputChannel.appendLine(`Restored ${loaded} files from persistent cache`);
-			}
-		},
-		(err) => {
-			outputChannel.appendLine(`Failed to load persistent cache: ${err}`);
-		},
-	);
+	persistentCache.load(stringCache, folderUris).catch((err) => {
+		outputChannel.appendLine(`Failed to load persistent cache: ${err}`);
+	});
 
 	// Prune stale cache files in the background
 	persistentCache.pruneStale().catch(() => {});
+
+	// Periodically save the cache if it has been modified
+	saveInterval = setInterval(() => {
+		saveIfDirty().catch(() => {});
+	}, SAVE_INTERVAL_MS);
 
 	// Register the search panel webview
 	const searchPanelProvider = new SearchPanelProvider(
@@ -43,6 +61,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		stringCache,
 		context.workspaceState,
 		outputChannel,
+		() => {
+			if (!hasPerformedInitialSave) {
+				hasPerformedInitialSave = true;
+				saveIfDirty().catch(() => {});
+			}
+		},
 	);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(VIEW_ID, searchPanelProvider),
@@ -94,12 +118,11 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-	if (persistentCache) {
-		const folderUris = getWorkspaceFolderUris();
-		// Save is fire-and-forget — VS Code allows a short grace period for deactivation
-		persistentCache.save(stringCache, folderUris).catch((err) => {
-			outputChannel.appendLine(`Failed to save persistent cache: ${err}`);
-		});
+	if (saveInterval) {
+		clearInterval(saveInterval);
+		saveInterval = undefined;
 	}
+	// Best-effort save — VS Code allows a short grace period for deactivation
+	saveIfDirty().catch(() => {});
 	stringCache.clear();
 }

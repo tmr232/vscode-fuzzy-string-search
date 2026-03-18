@@ -3,6 +3,10 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path";
 import type { CacheEntry, StringCache } from "./string-cache.js";
 
+export interface PersistentCacheLogger {
+	appendLine(message: string): void;
+}
+
 /**
  * Current schema version. Bump on breaking changes to force a full re-parse.
  */
@@ -46,9 +50,11 @@ function workspaceHash(workspaceFolderUris: string[]): string {
  */
 export class PersistentCache {
 	private readonly cacheDir: string;
+	private readonly logger?: PersistentCacheLogger;
 
-	constructor(globalStoragePath: string) {
+	constructor(globalStoragePath: string, logger?: PersistentCacheLogger) {
 		this.cacheDir = join(globalStoragePath, "cache");
+		this.logger = logger;
 	}
 
 	/**
@@ -61,17 +67,21 @@ export class PersistentCache {
 	 */
 	async load(cache: StringCache, workspaceFolderUris: string[]): Promise<number> {
 		const filePath = this.cacheFilePath(workspaceFolderUris);
+		this.logger?.appendLine(`Persistent cache path: ${filePath}`);
 
 		let data: PersistedCacheFile;
 		try {
 			const raw = await readFile(filePath, "utf-8");
 			data = JSON.parse(raw) as PersistedCacheFile;
 		} catch {
+			this.logger?.appendLine("Persistent cache: no cache file found");
 			return 0;
 		}
 
 		if (data.version !== CACHE_SCHEMA_VERSION) {
-			// Schema mismatch — discard and start fresh.
+			this.logger?.appendLine(
+				`Persistent cache: schema version mismatch (got ${data.version}, expected ${CACHE_SCHEMA_VERSION}) — discarding`,
+			);
 			await this.deleteFile(filePath);
 			return 0;
 		}
@@ -109,6 +119,9 @@ export class PersistentCache {
 			}
 		}
 
+		this.logger?.appendLine(`Persistent cache: loaded ${loaded}/${uris.length} entries`);
+		// Loading from disk doesn't count as a modification needing re-save
+		cache.clearDirty();
 		return loaded;
 	}
 
@@ -134,6 +147,8 @@ export class PersistentCache {
 		const filePath = this.cacheFilePath(workspaceFolderUris);
 		await mkdir(this.cacheDir, { recursive: true });
 		await writeFile(filePath, JSON.stringify(data), "utf-8");
+		cache.clearDirty();
+		this.logger?.appendLine(`Persistent cache: saved ${cache.size} entries to ${filePath}`);
 	}
 
 	/**

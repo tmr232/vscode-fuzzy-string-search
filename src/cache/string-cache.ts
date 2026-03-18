@@ -18,6 +18,21 @@ export interface CacheEntry {
  */
 export class StringCache {
 	private readonly cache = new Map<string, CacheEntry>();
+	private _dirty = false;
+
+	/**
+	 * Whether the cache has been modified since the last call to {@link clearDirty}.
+	 */
+	get dirty(): boolean {
+		return this._dirty;
+	}
+
+	/**
+	 * Reset the dirty flag (e.g. after persisting to disk).
+	 */
+	clearDirty(): void {
+		this._dirty = false;
+	}
 
 	/**
 	 * Get cached strings for a file URI.
@@ -40,6 +55,7 @@ export class StringCache {
 	 */
 	set(uri: string, strings: SourceString[], contentHash: string): void {
 		this.cache.set(uri, { contentHash, strings });
+		this._dirty = true;
 	}
 
 	/**
@@ -47,7 +63,9 @@ export class StringCache {
 	 * Returns `true` if an entry was removed, `false` if no entry existed.
 	 */
 	invalidate(uri: string): boolean {
-		return this.cache.delete(uri);
+		const deleted = this.cache.delete(uri);
+		if (deleted) this._dirty = true;
+		return deleted;
 	}
 
 	/**
