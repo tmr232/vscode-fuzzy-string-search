@@ -490,7 +490,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 	const langCheckboxes = document.querySelectorAll('.lang-checkbox');
 
 	let debounceTimer = null;
-	
+
 	const DEBOUNCE_MS = 300;
 
 	function getEnabledLanguageIds() {

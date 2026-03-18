@@ -17,7 +17,7 @@ We add a single `LanguageSupport` implementation (`src/languages/cpp.ts`) that h
 The tree-sitter-cpp grammar produces two distinct string node types:
 
 - **`string_literal`**: Regular string literals with optional encoding prefixes (`L"..."`, `u"..."`, `U"..."`, `u8"..."`). Children include the opening token (with prefix), `string_content` nodes, `escape_sequence` nodes, and the closing `"`.
-- **`raw_string_literal`**: Raw string literals (`R"(...)"`  or `R"delim(...)delim"`). Children include the opening `R"`, optional `raw_string_delimiter`, `(`, `raw_string_content`, `)`, optional `raw_string_delimiter`, and closing `"`.
+- **`raw_string_literal`**: Raw string literals (`R"(...)"` or `R"delim(...)delim"`). Children include the opening `R"`, optional `raw_string_delimiter`, `(`, `raw_string_content`, `)`, optional `raw_string_delimiter`, and closing `"`.
 
 Both are listed in `stringNodeTypes` so the string collector picks them up.
 

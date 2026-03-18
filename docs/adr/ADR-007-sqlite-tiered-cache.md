@@ -63,12 +63,12 @@ On first search the cache is validated by re-reading and hashing cached files. T
 
 ### Why SQLite over the original JSON
 
-| Concern | JSON (ADR-006) | SQLite (this ADR) |
-|---|---|---|
-| Incremental updates | Full rewrite on every save | Scoped `INSERT`/`DELETE` per file |
-| Disk size | ~200 MB for large workspaces | Smaller (deduplicated strings, no redundant location fields, SQLite page compression) |
-| Startup data loaded | Everything (all strings + all locations) | Strings only; locations loaded on demand |
-| Memory for matching | Full `SourceString[]` with all segments | Flat `string[]` (content only) |
+| Concern             | JSON (ADR-006)                           | SQLite (this ADR)                                                                     |
+| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------- |
+| Incremental updates | Full rewrite on every save               | Scoped `INSERT`/`DELETE` per file                                                     |
+| Disk size           | ~200 MB for large workspaces             | Smaller (deduplicated strings, no redundant location fields, SQLite page compression) |
+| Startup data loaded | Everything (all strings + all locations) | Strings only; locations loaded on demand                                              |
+| Memory for matching | Full `SourceString[]` with all segments  | Flat `string[]` (content only)                                                        |
 
 ### Why not a gzipped flat file for strings
 

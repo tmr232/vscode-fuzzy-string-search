@@ -1,20 +1,20 @@
 The idea is to build an extension for VSCode that allows fuzzy-matching against strings in the source-code.
 
-The matching logic should be similar to C:\Code\github.com\tmr232\source-strings\
+The matching logic should be similar to C:\\Code\\github.com\\tmr232\\source-strings\\
 
 The algorithm on a per-file bases:
+
 1. Parse the file using tree-sitter
 2. Find all the strings in the file, including template or format strings.
 3. Fuzzy-match the user query against the strings
-4. Present the results to the user, sorted by match score, with a user-defined score-cutoff. 
-
+4. Present the results to the user, sorted by match score, with a user-defined score-cutoff.
 
 As far as the extension goes, it should have a side panel similar to the VSCode search panel.
 The user inputs should be the query, the score-cutoff, and the files to include/exclude.
 Naturally, git-ignored files should be ignored by default.
 
-Package management should be done using `bun`. 
-Bun should also be used for all `npm` or `npx` commands, 
+Package management should be done using `bun`.
+Bun should also be used for all `npm` or `npx` commands,
 and `bun run` prefered over `bunx` as we should add all our dependencies to the project.
 
 Tests should be written using vitest.
@@ -27,6 +27,7 @@ Formatting and linting should be done using biome.js and oxlint. We want both li
 
 pre-commit hooks should be set up using prek (https://prek.j178.dev/).
 They should include:
+
 - biome and js, for formatting and linting
 - https://github.com/tmr232/precommit-ad-blocker/ with the default config
 - Zizmor https://github.com/zizmorcore/zizmor-pre-commit to ensure the security of our github actions
@@ -38,6 +39,7 @@ Publishing should be done both the the VSCode marketplace, and to open-vsx.
 fuzzy-matching should be implemented using https://www.npmjs.com/package/fuzzball
 
 As for supported languages, the priorities are:
+
 1. Python
 2. C++
 3. Other languages
@@ -51,7 +53,7 @@ Tests should include both string extraction (including concatenating strings whe
 and string matching (to ensure it actually works).
 
 If possible, processing files should be done in parallel to get a fast response.
-That said, it should not block the UI, and should be interruptible (results show up as 
+That said, it should not block the UI, and should be interruptible (results show up as
 they are found, so the user can always say "I have enough, stop!").
 
 A temporary cache of strings-per-file should be saved, to make future searches faster.

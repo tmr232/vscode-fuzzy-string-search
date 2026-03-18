@@ -12,6 +12,7 @@ Tree-sitter provides two JavaScript/TypeScript bindings:
 2. **web-tree-sitter** — WebAssembly-based, runs anywhere WASM is supported
 
 Our extension runs inside VSCode, which uses Electron. Native addons in Electron require:
+
 - Rebuilding against the specific Electron ABI version
 - Platform-specific prebuilt binaries (win32-x64, linux-x64, darwin-arm64, etc.)
 - Careful handling of `node-gyp` build requirements on end-user machines

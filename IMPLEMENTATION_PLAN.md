@@ -1,8 +1,8 @@
 # Implementation Plan: VSCode Fuzzy String Search
 
-A VSCode extension for fuzzy-matching against strings in source code, using tree-sitter for parsing and fuzzball for matching. Modeled after the [source-strings](file:///C:/Code/github.com/tmr232/source-strings/) Python CLI tool.
+A VSCode extension for fuzzy-matching against strings in source code, using tree-sitter for parsing and fuzzball for matching. Modeled after the \[source-strings\](file:///C:/Code/github.com/tmr232/source-strings/) Python CLI tool.
 
----
+______________________________________________________________________
 
 ## Phase 1: Project Scaffolding
 
@@ -11,7 +11,7 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 - [x] **1.3** Set up esbuild for extension bundling (Node target, `vscode` as external)
 - [x] **1.4** Install and configure vitest (`vitest.config.ts`, `test` script in `package.json`)
 - [x] **1.5** Install and configure biome.js (`biome.json`) and oxlint for linting/formatting
-- [x] **1.6** Create `.gitignore` (node_modules, out, .vscode-test, wasm/*.wasm)
+- [x] **1.6** Create `.gitignore` (node_modules, out, .vscode-test, wasm/\*.wasm)
 - [x] **1.7** Create `.vscodeignore` to exclude dev files from packaged extension
 - [x] **1.8** Create initial `src/extension.ts` with empty `activate`/`deactivate`
 - [x] **1.9** Create directory structure:
@@ -193,7 +193,7 @@ A VSCode extension for fuzzy-matching against strings in source code, using tree
 - [ ] **11.7** Verify GitHub Actions workflows run correctly
 - [ ] **11.8** Tag v0.1.0 and test the publish workflow
 
----
+______________________________________________________________________
 
 ## Future Work (Post-MVP)
 

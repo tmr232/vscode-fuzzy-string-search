@@ -20,14 +20,14 @@ Think of it as "grep for string contents" — but fuzzy, so typos and partial ma
 
 ## Supported Languages
 
-| Language | File Extensions | String Types |
-|----------|----------------|--------------|
-| Python   | `.py`, `.pyi`  | Single/double/triple-quoted, f-strings (interpolation → `{}`), raw strings, byte strings, concatenated strings |
-| C/C++    | `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.hh` | String literals (with `L`/`u`/`U`/`u8` prefixes), raw string literals, escape sequences, concatenated strings |
-| TypeScript | `.ts`, `.mts`, `.cts` | Single/double-quoted strings, template literals (interpolation → `{}`), escape sequences |
-| TSX      | `.tsx`         | Same as TypeScript, plus JSX contexts |
-| JavaScript | `.js`, `.mjs`, `.cjs` | Same as TypeScript |
-| JSX      | `.jsx`         | Same as TSX |
+| Language   | File Extensions                                          | String Types                                                                                                   |
+| ---------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Python     | `.py`, `.pyi`                                            | Single/double/triple-quoted, f-strings (interpolation → `{}`), raw strings, byte strings, concatenated strings |
+| C/C++      | `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.hh` | String literals (with `L`/`u`/`U`/`u8` prefixes), raw string literals, escape sequences, concatenated strings  |
+| TypeScript | `.ts`, `.mts`, `.cts`                                    | Single/double-quoted strings, template literals (interpolation → `{}`), escape sequences                       |
+| TSX        | `.tsx`                                                   | Same as TypeScript, plus JSX contexts                                                                          |
+| JavaScript | `.js`, `.mjs`, `.cjs`                                    | Same as TypeScript                                                                                             |
+| JSX        | `.jsx`                                                   | Same as TSX                                                                                                    |
 
 Use the **⋯ languages** toggle in the search panel to select which languages to include in searches. The selection is persisted per workspace.
 
@@ -52,10 +52,10 @@ Click **⋯ filters** below the search box to access:
 
 ## Configuration
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `fuzzyStringSearch.defaultScoreCutoff` | `60` | Minimum fuzzy match score (0–100) to include in results |
-| `fuzzyStringSearch.maxResults` | `100` | Maximum number of results to return (0 for unlimited) |
+| Setting                                | Default | Description                                             |
+| -------------------------------------- | ------- | ------------------------------------------------------- |
+| `fuzzyStringSearch.defaultScoreCutoff` | `60`    | Minimum fuzzy match score (0–100) to include in results |
+| `fuzzyStringSearch.maxResults`         | `100`   | Maximum number of results to return (0 for unlimited)   |
 
 ## How It Works
 

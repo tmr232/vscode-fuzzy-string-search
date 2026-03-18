@@ -1,6 +1,15 @@
 default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
+  # Default cleanups
+  - repo: 'https://github.com/pre-commit/pre-commit-hooks'
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
   # Biome - formatting and linting (uses local install)
   - repo: local
     hooks:
@@ -28,3 +37,13 @@ repos:
     rev: v0.11.4
     hooks:
       - id: ratchet-pin
+
+  # mdformat - format Markdown files
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+    - id: mdformat
+      additional_dependencies:
+      - mdformat-gfm
+      - mdformat-beautysh
+      - mdformat-config

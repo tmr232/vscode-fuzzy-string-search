@@ -30,7 +30,7 @@ This can be stored separately from the rest of the cache so it is quick to load 
 For matching, all we need is the strings themselves.
 There is no need to load the location data before we get an actual match.
 
-The string literals are also the biggest chunk of data, so being able to 
+The string literals are also the biggest chunk of data, so being able to
 deduplicate and compress them might be a good idea.
 
 Once we have a matched string, we can find the file locations it is in based on an index of sorts.
