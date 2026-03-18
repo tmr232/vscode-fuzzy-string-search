@@ -59,21 +59,35 @@ export interface SearchOptions {
 }
 
 /**
+ * Per-language count of files that failed to parse during a search.
+ */
+export type ParseFailures = Record<string, number>;
+
+/**
  * Result of a search operation, including results and timing information.
  */
 export interface SearchResult {
 	results: MatchResult[];
 	timings: SearchTimings;
+	/** Number of files that failed to read or parse, keyed by language ID. */
+	parseFailures: ParseFailures;
 }
 
 const DEFAULT_SCORE_CUTOFF = 60;
 const DEFAULT_MAX_RESULTS = 100;
 const CONCURRENCY_LIMIT = 8;
 
+interface FileParseResult {
+	strings?: SourceString[];
+	/** Set to the language ID when the file failed to read or parse. */
+	failedLanguageId?: string;
+}
+
 /**
  * Parse a single file and return its source strings, using the cache when available.
  *
- * Returns `undefined` if the file's language is unsupported or parsing fails.
+ * Returns `undefined` strings if the file's language is unsupported or filtered out.
+ * Sets `failedLanguageId` when the file could be identified but failed to read or parse.
  */
 async function getStringsForFile(
 	uri: vscode.Uri,
@@ -81,15 +95,15 @@ async function getStringsForFile(
 	wasmDir: string,
 	enabledLanguageIds?: string[],
 	logger?: SearchLogger,
-): Promise<SourceString[] | undefined> {
+): Promise<FileParseResult> {
 	const uriString = uri.toString();
 	const cached = cache.get(uriString);
-	if (cached) return cached;
+	if (cached) return { strings: cached };
 
 	const filePath = uri.fsPath;
 	const langSupport = getLanguageForFile(filePath);
-	if (!langSupport) return undefined;
-	if (enabledLanguageIds && !enabledLanguageIds.includes(langSupport.languageId)) return undefined;
+	if (!langSupport) return {};
+	if (enabledLanguageIds && !enabledLanguageIds.includes(langSupport.languageId)) return {};
 
 	const wasmPath = join(wasmDir, langSupport.wasmFileName);
 
@@ -97,7 +111,7 @@ async function getStringsForFile(
 	try {
 		source = await readFile(filePath, "utf-8");
 	} catch {
-		return undefined;
+		return { failedLanguageId: langSupport.languageId };
 	}
 
 	try {
@@ -106,11 +120,11 @@ async function getStringsForFile(
 		const strings = collectStrings(source, filePath, parser, langSupport);
 		const contentHash = createHash("sha256").update(source).digest("hex");
 		cache.set(uriString, strings, contentHash);
-		return strings;
+		return { strings };
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
 		logger?.appendLine(`Failed to parse ${filePath}: ${message}`);
-		return undefined;
+		return { failedLanguageId: langSupport.languageId };
 	}
 }
 
@@ -154,6 +168,7 @@ export async function search(
 	const emptyResult: SearchResult = {
 		results: [],
 		timings: { discoverySec: 0, collectSec: 0, matchSec: 0, totalSec: 0 },
+		parseFailures: {},
 	};
 	if (query === "") return emptyResult;
 
@@ -189,6 +204,7 @@ export async function search(
 
 	const allResults: MatchResult[] = [];
 	const allStrings: SourceString[] = [];
+	const parseFailures: ParseFailures = {};
 
 	let parsed = 0;
 	let cachedFiles = 0;
@@ -198,7 +214,7 @@ export async function search(
 	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
 		const wasCached = cache.get(uri.toString()) !== undefined;
-		const strings = await getStringsForFile(
+		const { strings, failedLanguageId } = await getStringsForFile(
 			uri,
 			cache,
 			wasmDir,
@@ -207,6 +223,9 @@ export async function search(
 		);
 		parsed++;
 		if (wasCached) cachedFiles++;
+		if (failedLanguageId) {
+			parseFailures[failedLanguageId] = (parseFailures[failedLanguageId] ?? 0) + 1;
+		}
 		onProgress?.(parsed, totalFiles);
 		if (!strings || strings.length === 0) return;
 		allStrings.push(...strings);
@@ -241,5 +260,6 @@ export async function search(
 	return {
 		results,
 		timings: { discoverySec, collectSec, matchSec, totalSec },
+		parseFailures,
 	};
 }

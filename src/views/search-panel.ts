@@ -174,12 +174,13 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 				}
 			},
 		})
-			.then(({ results: allResults, timings }) => {
+			.then(({ results: allResults, timings, parseFailures }) => {
 				if (token.isCancellationRequested) return;
 				this.postMessage({
 					type: "results",
 					results: formatResults(allResults, workspaceRoot, query),
 					timings,
+					parseFailures,
 				});
 				this.onSearchComplete?.();
 			})
@@ -282,7 +283,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 			(l) =>
 				`<div class="checkbox-group">
 			<input type="checkbox" class="lang-checkbox" data-lang-id="${l.id}" ${l.enabled ? "checked" : ""} />
-			<label>${l.id} <span class="lang-count" data-count-id="${l.id}"></span></label>
+			<label>${l.id} <span class="lang-count" data-count-id="${l.id}"></span><span class="lang-failures" data-failures-id="${l.id}"></span></label>
 		</div>`,
 		)
 		.join("\n\t\t");
@@ -373,6 +374,13 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 	}
 	.lang-count {
 		opacity: 0.7;
+	}
+	.lang-failures {
+		color: var(--vscode-errorForeground);
+	}
+	.parse-failures {
+		color: var(--vscode-errorForeground);
+		font-size: 11px;
 	}
 	.status {
 		font-size: 11px;
@@ -502,7 +510,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 		if (savedState.currentFileOnly) currentFileOnlyInput.checked = savedState.currentFileOnly;
 		if (savedState.groupByFile) groupByFileInput.checked = savedState.groupByFile;
 		if (savedState.results && savedState.results.length > 0) {
-			renderResults(savedState.results);
+			renderResults(savedState.results, savedState.parseFailures);
 		}
 		if (savedState.timings) {
 			renderTimings(savedState.timings);
@@ -515,7 +523,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 		}
 	}
 
-	function saveState(results, timings) {
+	function saveState(results, timings, parseFailures) {
 		vscode.setState({
 			query: queryInput.value,
 			scoreCutoff: scoreCutoffInput.value,
@@ -527,6 +535,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 			enabledLanguageIds: getEnabledLanguageIds(),
 			results: results || [],
 			timings: timings || null,
+			parseFailures: parseFailures || null,
 		});
 	}
 
@@ -582,8 +591,8 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 	groupByFileInput.addEventListener('change', () => {
 		const state = vscode.getState();
 		if (state && state.results && state.results.length > 0) {
-			renderResults(state.results);
-			saveState(state.results, state.timings);
+			renderResults(state.results, state.parseFailures);
+			saveState(state.results, state.timings, state.parseFailures);
 		}
 	});
 
@@ -623,13 +632,37 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 		return item;
 	}
 
-	function renderResults(results) {
+	function updateParseFailures(parseFailures) {
+		// Update per-language failure counts
+		const failureSpans = document.querySelectorAll('.lang-failures');
+		for (const span of failureSpans) {
+			const langId = span.dataset.failuresId;
+			const count = parseFailures && parseFailures[langId];
+			span.textContent = count ? ' ⚠ ' + count + ' failed' : '';
+		}
+	}
+
+	function renderResults(results, parseFailures) {
 		resultsEl.innerHTML = '';
+
+		// Overall failure summary
+		const totalFailed = parseFailures
+			? Object.values(parseFailures).reduce((a, b) => a + b, 0)
+			: 0;
+		const failureSuffix = totalFailed > 0
+			? ' · ' + totalFailed + ' file' + (totalFailed === 1 ? '' : 's') + ' failed to parse'
+			: '';
+
 		if (results.length === 0) {
-			statusEl.textContent = 'No results';
+			statusEl.innerHTML = 'No results' + (failureSuffix
+				? '<span class="parse-failures">' + failureSuffix + '</span>'
+				: '');
+			updateParseFailures(parseFailures);
 			return;
 		}
-		statusEl.textContent = results.length + ' result' + (results.length === 1 ? '' : 's');
+		statusEl.innerHTML = results.length + ' result' + (results.length === 1 ? '' : 's')
+			+ (failureSuffix ? '<span class="parse-failures">' + failureSuffix + '</span>' : '');
+		updateParseFailures(parseFailures);
 
 		if (groupByFileInput.checked) {
 			const groups = new Map();
@@ -665,9 +698,9 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 		} else if (message.type === 'progress') {
 			statusEl.textContent = 'Collecting strings from' + message.parsed + '/' + message.total + ' files';
 		} else if (message.type === 'results') {
-			renderResults(message.results);
+			renderResults(message.results, message.parseFailures);
 			renderTimings(message.timings);
-			saveState(message.results, message.timings);
+			saveState(message.results, message.timings, message.parseFailures);
 		} else if (message.type === 'error') {
 			statusEl.textContent = 'Error: ' + message.message;
 			timingsEl.textContent = '';
