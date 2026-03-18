@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CacheEntry, StringCache } from "./string-cache.js";
 
@@ -145,8 +145,10 @@ export class PersistentCache {
 		};
 
 		const filePath = this.cacheFilePath(workspaceFolderUris);
+		const tmpPath = `${filePath}.tmp`;
 		await mkdir(this.cacheDir, { recursive: true });
-		await writeFile(filePath, JSON.stringify(data), "utf-8");
+		await writeFile(tmpPath, JSON.stringify(data), "utf-8");
+		await rename(tmpPath, filePath);
 		cache.clearDirty();
 		this.logger?.appendLine(`Persistent cache: saved ${cache.size} entries to ${filePath}`);
 	}

@@ -7,6 +7,7 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 ### Changed
 
 - Persistent cache is now saved eagerly after the first search and periodically (every 10 minutes) when modified, instead of only at deactivation — this prevents cache loss if VS Code crashes or the extension host is killed
+- Persistent cache writes are now atomic (write-to-temp + rename) to prevent corruption from crashes mid-write
 - Added diagnostic logging for persistent cache operations (load path, load/save outcomes) to the output channel
 - Search timings now show wall-clock seconds instead of summed per-worker milliseconds, giving an accurate picture of actual user-experienced latency
 - Collect and match phases are now sequential (collect all strings, then match all at once) so each timing reflects true wall time
