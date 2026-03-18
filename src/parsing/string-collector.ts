@@ -69,23 +69,48 @@ function collectFromCursor(
 }
 
 /**
+ * Detailed timing breakdown for a single collectStrings call (milliseconds).
+ */
+export interface CollectTimings {
+	/** Milliseconds spent in tree-sitter parsing. */
+	parseMs: number;
+	/** Milliseconds spent walking the AST and collecting strings. */
+	collectMs: number;
+}
+
+/**
+ * Result of collectStrings, including extracted strings and timing breakdown.
+ */
+export interface CollectResult {
+	strings: SourceString[];
+	timings: CollectTimings;
+}
+
+/**
  * Parse source code and collect all string literals.
  *
  * @param source - The source code text to parse.
  * @param filePath - Absolute path to the file (used in returned SourceString objects).
  * @param parser - An initialized tree-sitter Parser with the language already set.
  * @param language - The LanguageSupport for the file's language.
- * @returns Array of extracted SourceString objects.
+ * @returns Extracted SourceString objects and timing breakdown.
  */
 export function collectStrings(
 	source: string,
 	filePath: string,
 	parser: Parser,
 	language: LanguageSupport,
-): SourceString[] {
+): CollectResult {
+	const parseStart = performance.now();
 	const tree = parser.parse(source);
-	if (!tree) return [];
+	const parseMs = performance.now() - parseStart;
 
+	if (!tree) return { strings: [], timings: { parseMs, collectMs: 0 } };
+
+	const collectStart = performance.now();
 	const cursor = tree.walk();
-	return collectFromCursor(cursor, language, filePath);
+	const strings = collectFromCursor(cursor, language, filePath);
+	const collectMs = performance.now() - collectStart;
+
+	return { strings, timings: { parseMs, collectMs } };
 }

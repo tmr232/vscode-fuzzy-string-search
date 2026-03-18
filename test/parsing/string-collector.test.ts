@@ -30,7 +30,7 @@ describe("collectStrings", () => {
 
 	it("should collect simple string literals", () => {
 		const source = 'x = "hello world"';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("hello world");
@@ -39,7 +39,7 @@ describe("collectStrings", () => {
 
 	it("should collect multiple strings from a file", () => {
 		const source = `x = "first"\ny = "second"\nz = "third"`;
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(3);
 		expect(results.map((s) => s.content)).toEqual(["first", "second", "third"]);
@@ -47,7 +47,7 @@ describe("collectStrings", () => {
 
 	it("should collect triple-quoted strings", () => {
 		const source = 'x = """triple quoted"""';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("triple quoted");
@@ -55,7 +55,7 @@ describe("collectStrings", () => {
 
 	it("should collect f-strings with interpolation replaced", () => {
 		const source = 'x = f"hello {name}"';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("hello {}");
@@ -63,7 +63,7 @@ describe("collectStrings", () => {
 
 	it("should collect concatenated strings as a single result", () => {
 		const source = 'x = ("hello " "world")';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("hello world");
@@ -71,7 +71,7 @@ describe("collectStrings", () => {
 
 	it("should not produce separate entries for children of concatenated strings", () => {
 		const source = 'x = ("a" "b" "c")';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("abc");
@@ -82,7 +82,7 @@ describe("collectStrings", () => {
     "first"  # inline comment
     "second"
 )`;
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("firstsecond");
@@ -90,7 +90,7 @@ describe("collectStrings", () => {
 
 	it("should include correct position information", () => {
 		const source = 'x = "hello"';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].startLine).toBe(0);
@@ -101,7 +101,7 @@ describe("collectStrings", () => {
 
 	it("should handle multiline triple-quoted strings with correct positions", () => {
 		const source = 'x = """line one\nline two\nline three"""';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("line one\nline two\nline three");
@@ -115,7 +115,7 @@ def foo():
     print("inside function")
     return "return value"
 `;
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(2);
 		expect(results.map((s) => s.content)).toEqual(["inside function", "return value"]);
@@ -123,13 +123,13 @@ def foo():
 
 	it("should return empty array for source with no strings", () => {
 		const source = "x = 42\ny = True\n";
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(0);
 	});
 
 	it("should return empty array for empty source", () => {
-		const results = collectStrings("", "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings("", "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(0);
 	});
@@ -137,7 +137,7 @@ def foo():
 	it("should collect all strings from the sample.py fixture", () => {
 		const samplePath = resolve(FIXTURE_DIR, "sample.py");
 		const source = readFileSync(samplePath, "utf-8");
-		const results = collectStrings(source, samplePath, parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, samplePath, parser, pythonLanguageSupport);
 
 		const contents = results.map((s) => s.content);
 
@@ -175,7 +175,7 @@ class MyClass:
     """docstring"""
     name = "default"
 `;
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(2);
 		expect(results.map((s) => s.content)).toEqual(["docstring", "default"]);
@@ -183,7 +183,7 @@ class MyClass:
 
 	it("should handle nested f-string content correctly", () => {
 		const source = 'x = f"start {a + b} middle {c} end"';
-		const results = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
+		const { strings: results } = collectStrings(source, "/test.py", parser, pythonLanguageSupport);
 
 		expect(results).toHaveLength(1);
 		expect(results[0].content).toBe("start {} middle {} end");

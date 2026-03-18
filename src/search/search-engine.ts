@@ -81,6 +81,10 @@ interface FileParseResult {
 	strings?: SourceString[];
 	/** Set to the language ID when the file failed to read or parse. */
 	failedLanguageId?: string;
+	/** Milliseconds spent in tree-sitter parsing (only set for freshly parsed files). */
+	parseMs?: number;
+	/** Milliseconds spent collecting strings from AST (only set for freshly parsed files). */
+	collectMs?: number;
 }
 
 /**
@@ -121,10 +125,10 @@ async function getStringsForFile(
 	try {
 		const language = await loadLanguage(wasmPath);
 		const parser = createParser(language);
-		const strings = collectStrings(source, filePath, parser, langSupport);
+		const { strings, timings } = collectStrings(source, filePath, parser, langSupport);
 		const contentHash = createHash("sha256").update(source).digest("hex");
 		cache.set(uriString, strings, contentHash);
-		return { strings };
+		return { strings, parseMs: timings.parseMs, collectMs: timings.collectMs };
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
 		logger?.appendLine(`Failed to parse ${filePath}: ${message}`);
@@ -213,13 +217,15 @@ export async function search(
 
 	let parsed = 0;
 	let cachedFiles = 0;
+	let totalParseMs = 0;
+	let totalCollectMs = 0;
 	const onProgress = options?.onProgress;
 	const totalFiles = files.length;
 
 	const collectStart = performance.now();
 	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
 		const wasCached = cache.get(uri.toString()) !== undefined;
-		const { strings, failedLanguageId } = await getStringsForFile(
+		const { strings, failedLanguageId, parseMs, collectMs } = await getStringsForFile(
 			uri,
 			cache,
 			wasmDir,
@@ -228,6 +234,8 @@ export async function search(
 		);
 		parsed++;
 		if (wasCached) cachedFiles++;
+		if (parseMs !== undefined) totalParseMs += parseMs;
+		if (collectMs !== undefined) totalCollectMs += collectMs;
 		if (failedLanguageId) {
 			parseFailures[failedLanguageId] = (parseFailures[failedLanguageId] ?? 0) + 1;
 		}
@@ -239,6 +247,9 @@ export async function search(
 
 	logger?.appendLine(
 		`Collection: ${allStrings.length} strings from ${parsed} files (${cachedFiles} from cache) in ${collectSec.toFixed(2)}s`,
+	);
+	logger?.appendLine(
+		`  Tree-sitter parsing: ${toSec(totalParseMs).toFixed(3)}s, string collection: ${toSec(totalCollectMs).toFixed(3)}s (cumulative across files)`,
 	);
 
 	const matchStart = performance.now();
