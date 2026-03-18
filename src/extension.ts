@@ -43,9 +43,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	// Load persisted cache in the background (non-blocking)
 	const folderUris = getWorkspaceFolderUris();
-	persistentCache.load(stringCache, folderUris).catch((err) => {
-		outputChannel.appendLine(`Failed to load persistent cache: ${err}`);
-	});
+	const loadStart = performance.now();
+	persistentCache
+		.load(stringCache, folderUris)
+		.then(() => {
+			const loadSec = ((performance.now() - loadStart) / 1000).toFixed(2);
+			outputChannel.appendLine(`Persistent cache loaded in ${loadSec}s`);
+		})
+		.catch((err) => {
+			outputChannel.appendLine(`Failed to load persistent cache: ${err}`);
+		});
 
 	// Prune stale cache files in the background
 	persistentCache.pruneStale().catch(() => {});

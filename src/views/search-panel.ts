@@ -696,7 +696,7 @@ function getWebviewHtml(defaultCutoff: number, languages: LanguageInfo[]): strin
 			timingsEl.textContent = '';
 			resultsEl.innerHTML = '';
 		} else if (message.type === 'progress') {
-			statusEl.textContent = 'Collecting strings from' + message.parsed + '/' + message.total + ' files';
+			statusEl.textContent = 'Collecting strings from ' + message.parsed + '/' + message.total + ' files';
 		} else if (message.type === 'results') {
 			renderResults(message.results, message.parseFailures);
 			renderTimings(message.timings);
