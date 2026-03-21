@@ -81,10 +81,11 @@ export class SqliteCache {
 			strings: SourceString[];
 			contentHash: string;
 		} | null>,
+		onProgress?: (parsed: number, total: number) => void,
 	): Promise<void> {
 		if (!this.ready) {
 			await this.initDb(workspaceFolderUris, wasmDir);
-			await this.validateAndSync(allFileUris, parseFile);
+			await this.validateAndSync(allFileUris, parseFile, onProgress);
 			this.ready = true;
 			return;
 		}
@@ -355,6 +356,7 @@ export class SqliteCache {
 			strings: SourceString[];
 			contentHash: string;
 		} | null>,
+		onProgress?: (parsed: number, total: number) => void,
 	): Promise<void> {
 		if (!this.db) return;
 
@@ -419,6 +421,7 @@ export class SqliteCache {
 				this.upsertFile(uri, result.contentHash, result.strings);
 				parsed++;
 			}
+			onProgress?.(parsed, toParse.length);
 		}
 
 		if (parsed > 0 || deletedUris.length > 0 || staleUris.length > 0) {

@@ -172,6 +172,9 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			token,
 			fileUris,
 			logger: this.outputChannel,
+			onProgress: (parsed, total) => {
+				this.postMessage({ type: "progress", parsed, total });
+			},
 		})
 			.then(({ results: allResults, timings, parseFailures }) => {
 				if (token.isCancellationRequested) return;
