@@ -122,16 +122,17 @@ function makeFileParser(
 			return null;
 		}
 
+		const contentHash = createHash("sha256").update(source).digest("hex");
+
 		try {
 			const language = await loadLanguage(wasmPath);
 			const parser = createParser(language);
 			const { strings } = collectStrings(source, fsPath, parser, langSupport);
-			const contentHash = createHash("sha256").update(source).digest("hex");
 			return { strings, contentHash };
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			logger?.appendLine(`Failed to parse ${fsPath}: ${message}`);
-			cache.setFailed(uri, langSupport.languageId);
+			cache.setFailed(uri, langSupport.languageId, contentHash);
 			parseFailures[langSupport.languageId] = (parseFailures[langSupport.languageId] ?? 0) + 1;
 			return null;
 		}

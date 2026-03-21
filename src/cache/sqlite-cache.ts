@@ -11,7 +11,7 @@ export interface CacheLogger {
 /**
  * Current schema version. Bump on breaking changes to force a full re-create.
  */
-const CACHE_SCHEMA_VERSION = 1;
+const CACHE_SCHEMA_VERSION = 2;
 
 /**
  * A location row returned when querying matched string IDs.
@@ -114,9 +114,19 @@ export class SqliteCache {
 
 	/**
 	 * Record that a file URI failed to parse.
+	 * If a contentHash is provided, the failure is also persisted to the DB
+	 * so it survives across sessions.
 	 */
-	setFailed(uri: string, languageId: string): void {
+	setFailed(uri: string, languageId: string, contentHash?: string): void {
 		this.failedUris.set(uri, languageId);
+		if (this.db && contentHash) {
+			this.db.run("INSERT OR REPLACE INTO files (uri, hash, failed_lang) VALUES (?, ?, ?)", [
+				uri,
+				contentHash,
+				languageId,
+			]);
+			this.dirty = true;
+		}
 	}
 
 	/**
@@ -305,8 +315,9 @@ export class SqliteCache {
 	private createSchema(db: Database): void {
 		db.run(`
 			CREATE TABLE files (
-				uri   TEXT PRIMARY KEY,
-				hash  TEXT NOT NULL
+				uri         TEXT PRIMARY KEY,
+				hash        TEXT NOT NULL,
+				failed_lang TEXT
 			);
 
 			CREATE TABLE strings (
@@ -362,50 +373,75 @@ export class SqliteCache {
 
 		const allFileSet = new Set(allFileUris);
 
-		// Find cached files that no longer exist in the workspace
-		const cachedUris: string[] = [];
-		const stmt = this.db.prepare("SELECT uri FROM files");
+		// Bulk-load all cached file info into Maps (single query)
+		const cachedHashes = new Map<string, string>();
+		const cachedFailures = new Map<string, string>();
+		const stmt = this.db.prepare("SELECT uri, hash, failed_lang FROM files");
 		while (stmt.step()) {
-			cachedUris.push(stmt.get()[0] as string);
+			const row = stmt.get();
+			const uri = row[0] as string;
+			cachedHashes.set(uri, row[1] as string);
+			if (row[2]) {
+				cachedFailures.set(uri, row[2] as string);
+			}
 		}
 		stmt.free();
 
-		const deletedUris = cachedUris.filter((uri) => !allFileSet.has(uri));
-		if (deletedUris.length > 0) {
-			this.removeFiles(deletedUris);
-			this.logger?.appendLine(`SQLite cache: removed ${deletedUris.length} deleted files`);
-		}
+		let deletedUris: string[] = [];
+		let staleUris: string[] = [];
+		let newUris: string[];
 
-		// Validate remaining cached files by content hash
-		const staleUris: string[] = [];
-		const newUris: string[] = [];
+		if (cachedHashes.size === 0) {
+			// Fresh DB — everything is new, skip expensive validation
+			newUris = allFileUris;
+			this.logger?.appendLine(`SQLite cache: fresh database, ${newUris.length} files to parse`);
+		} else {
+			// Find cached files that no longer exist in the workspace
+			deletedUris = [...cachedHashes.keys()].filter((uri) => !allFileSet.has(uri));
+			if (deletedUris.length > 0) {
+				this.removeFiles(deletedUris);
+				this.logger?.appendLine(`SQLite cache: removed ${deletedUris.length} deleted files`);
+			}
 
-		for (const uri of allFileUris) {
-			const cachedHash = this.getCachedHash(uri);
-			if (cachedHash === undefined) {
-				newUris.push(uri);
-				continue;
-			}
-			// Read and hash the file to check staleness
-			const fsPath = fileUriToFsPath(uri);
-			if (!fsPath) {
-				staleUris.push(uri);
-				continue;
-			}
-			try {
-				const content = await readFile(fsPath, "utf-8");
-				const hash = createHash("sha256").update(content).digest("hex");
-				if (hash !== cachedHash) {
+			// Partition workspace files into new vs. potentially stale
+			staleUris = [];
+			newUris = [];
+
+			let skippedFailures = 0;
+			for (const uri of allFileUris) {
+				const cachedHash = cachedHashes.get(uri);
+				if (cachedHash === undefined) {
+					newUris.push(uri);
+					continue;
+				}
+				// Read and hash the file to check staleness
+				const fsPath = fileUriToFsPath(uri);
+				if (!fsPath) {
+					staleUris.push(uri);
+					continue;
+				}
+				try {
+					const content = await readFile(fsPath, "utf-8");
+					const hash = createHash("sha256").update(content).digest("hex");
+					if (hash !== cachedHash) {
+						staleUris.push(uri);
+					} else {
+						// Hash unchanged — restore persisted failure state
+						const failedLang = cachedFailures.get(uri);
+						if (failedLang) {
+							this.failedUris.set(uri, failedLang);
+							skippedFailures++;
+						}
+					}
+				} catch {
 					staleUris.push(uri);
 				}
-			} catch {
-				staleUris.push(uri);
 			}
-		}
 
-		this.logger?.appendLine(
-			`SQLite cache: ${cachedUris.length - deletedUris.length} cached, ${staleUris.length} stale, ${newUris.length} new`,
-		);
+			this.logger?.appendLine(
+				`SQLite cache: ${cachedHashes.size - deletedUris.length} cached, ${staleUris.length} stale, ${newUris.length} new, ${skippedFailures} previously failed (skipped)`,
+			);
+		}
 
 		// Re-parse stale files
 		if (staleUris.length > 0) {
@@ -414,23 +450,24 @@ export class SqliteCache {
 
 		// Parse new and stale files
 		const toParse = [...newUris, ...staleUris];
-		let parsed = 0;
-		for (const uri of toParse) {
-			const result = await parseFile(uri);
+		const entries: { uri: string; contentHash: string; strings: SourceString[] }[] = [];
+		for (let i = 0; i < toParse.length; i++) {
+			const result = await parseFile(toParse[i]);
 			if (result) {
-				this.upsertFile(uri, result.contentHash, result.strings);
-				parsed++;
+				entries.push({ uri: toParse[i], contentHash: result.contentHash, strings: result.strings });
 			}
-			onProgress?.(parsed, toParse.length);
+			onProgress?.(i + 1, toParse.length);
 		}
 
-		if (parsed > 0 || deletedUris.length > 0 || staleUris.length > 0) {
+		this.bulkUpsertFiles(entries);
+
+		if (entries.length > 0 || deletedUris.length > 0 || staleUris.length > 0) {
 			this.cleanupOrphanedStrings();
 			this.loadStringsIntoMemory();
 		}
 
 		this.logger?.appendLine(
-			`SQLite cache: parsed ${parsed} files, total ${this.allContents.length} unique strings`,
+			`SQLite cache: parsed ${entries.length} files, total ${this.allContents.length} unique strings`,
 		);
 	}
 
@@ -456,12 +493,14 @@ export class SqliteCache {
 
 		if (changed.length > 0) {
 			this.removeFiles(changed);
+			const entries: { uri: string; contentHash: string; strings: SourceString[] }[] = [];
 			for (const uri of changed) {
 				const result = await parseFile(uri);
 				if (result) {
-					this.upsertFile(uri, result.contentHash, result.strings);
+					entries.push({ uri, contentHash: result.contentHash, strings: result.strings });
 				}
 			}
+			this.bulkUpsertFiles(entries);
 		}
 
 		if (changed.length > 0 || deleted.length > 0) {
@@ -471,20 +510,20 @@ export class SqliteCache {
 	}
 
 	/**
-	 * Insert or update a file and its strings/locations in the database.
+	 * Bulk insert/update files and their strings/locations in a single transaction.
+	 * Prepared statements are reused across all files for performance.
 	 */
-	private upsertFile(uri: string, contentHash: string, strings: SourceString[]): void {
-		if (!this.db) return;
+	private bulkUpsertFiles(
+		entries: { uri: string; contentHash: string; strings: SourceString[] }[],
+	): void {
+		if (!this.db || entries.length === 0) return;
 
 		this.db.run("BEGIN TRANSACTION");
 		try {
-			// Upsert file record
-			this.db.run("INSERT OR REPLACE INTO files (uri, hash) VALUES (?, ?)", [uri, contentHash]);
-
-			// Delete old locations for this file
-			this.db.run("DELETE FROM locations WHERE file_uri = ?", [uri]);
-
-			// Insert strings and locations
+			const upsertFileStmt = this.db.prepare(
+				"INSERT OR REPLACE INTO files (uri, hash, failed_lang) VALUES (?, ?, NULL)",
+			);
+			const deleteLocsStmt = this.db.prepare("DELETE FROM locations WHERE file_uri = ?");
 			const insertStringStmt = this.db.prepare(
 				"INSERT OR IGNORE INTO strings (content) VALUES (?)",
 			);
@@ -493,22 +532,29 @@ export class SqliteCache {
 				"INSERT INTO locations (string_id, file_uri, segments) VALUES (?, ?, ?)",
 			);
 
-			for (const str of strings) {
-				// Insert string (ignore if duplicate due to UNIQUE constraint)
-				insertStringStmt.run([str.content]);
-				insertStringStmt.reset();
+			for (const entry of entries) {
+				upsertFileStmt.run([entry.uri, entry.contentHash]);
+				upsertFileStmt.reset();
 
-				// Get string ID
-				getStringIdStmt.bind([str.content]);
-				getStringIdStmt.step();
-				const stringId = getStringIdStmt.get()[0] as number;
-				getStringIdStmt.reset();
+				deleteLocsStmt.run([entry.uri]);
+				deleteLocsStmt.reset();
 
-				// Insert location
-				insertLocationStmt.run([stringId, uri, JSON.stringify(str.segments)]);
-				insertLocationStmt.reset();
+				for (const str of entry.strings) {
+					insertStringStmt.run([str.content]);
+					insertStringStmt.reset();
+
+					getStringIdStmt.bind([str.content]);
+					getStringIdStmt.step();
+					const stringId = getStringIdStmt.get()[0] as number;
+					getStringIdStmt.reset();
+
+					insertLocationStmt.run([stringId, entry.uri, JSON.stringify(str.segments)]);
+					insertLocationStmt.reset();
+				}
 			}
 
+			upsertFileStmt.free();
+			deleteLocsStmt.free();
 			insertStringStmt.free();
 			getStringIdStmt.free();
 			insertLocationStmt.free();
