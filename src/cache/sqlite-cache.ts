@@ -403,38 +403,50 @@ export class SqliteCache {
 				this.logger?.appendLine(`SQLite cache: removed ${deletedUris.length} deleted files`);
 			}
 
-			// Partition workspace files into new vs. potentially stale
-			staleUris = [];
+			// Partition workspace files: separate uncached (new) from cached (need hash check)
 			newUris = [];
-
-			let skippedFailures = 0;
+			const cachedUrisToCheck: string[] = [];
 			for (const uri of allFileUris) {
-				const cachedHash = cachedHashes.get(uri);
-				if (cachedHash === undefined) {
+				if (cachedHashes.has(uri)) {
+					cachedUrisToCheck.push(uri);
+				} else {
 					newUris.push(uri);
-					continue;
 				}
-				// Read and hash the file to check staleness
-				const fsPath = fileUriToFsPath(uri);
-				if (!fsPath) {
-					staleUris.push(uri);
-					continue;
-				}
-				try {
-					const content = await readFile(fsPath, "utf-8");
-					const hash = createHash("sha256").update(content).digest("hex");
-					if (hash !== cachedHash) {
-						staleUris.push(uri);
-					} else {
-						// Hash unchanged — restore persisted failure state
+			}
+
+			// Check staleness of cached files concurrently
+			staleUris = [];
+			let skippedFailures = 0;
+
+			type CheckResult = "fresh" | "stale" | { failedLang: string };
+			const results = await mapConcurrent(
+				cachedUrisToCheck,
+				DEFAULT_CONCURRENCY,
+				async (uri): Promise<CheckResult> => {
+					const cachedHash = cachedHashes.get(uri);
+					if (!cachedHash) return "stale";
+					const fsPath = fileUriToFsPath(uri);
+					if (!fsPath) return "stale";
+					try {
+						const content = await readFile(fsPath, "utf-8");
+						const hash = createHash("sha256").update(content).digest("hex");
+						if (hash !== cachedHash) return "stale";
 						const failedLang = cachedFailures.get(uri);
-						if (failedLang) {
-							this.failedUris.set(uri, failedLang);
-							skippedFailures++;
-						}
+						if (failedLang) return { failedLang };
+						return "fresh";
+					} catch {
+						return "stale";
 					}
-				} catch {
-					staleUris.push(uri);
+				},
+			);
+
+			for (let i = 0; i < cachedUrisToCheck.length; i++) {
+				const result = results[i];
+				if (result === "stale") {
+					staleUris.push(cachedUrisToCheck[i]);
+				} else if (typeof result === "object") {
+					this.failedUris.set(cachedUrisToCheck[i], result.failedLang);
+					skippedFailures++;
 				}
 			}
 
@@ -448,16 +460,17 @@ export class SqliteCache {
 			this.removeFiles(staleUris);
 		}
 
-		// Parse new and stale files
+		// Parse new and stale files concurrently
 		const toParse = [...newUris, ...staleUris];
-		const entries: { uri: string; contentHash: string; strings: SourceString[] }[] = [];
-		for (let i = 0; i < toParse.length; i++) {
-			const result = await parseFile(toParse[i]);
-			if (result) {
-				entries.push({ uri: toParse[i], contentHash: result.contentHash, strings: result.strings });
-			}
-			onProgress?.(i + 1, toParse.length);
-		}
+		let completed = 0;
+		const parseResults = await mapConcurrent(toParse, DEFAULT_CONCURRENCY, async (uri) => {
+			const result = await parseFile(uri);
+			onProgress?.(++completed, toParse.length);
+			return result ? { uri, contentHash: result.contentHash, strings: result.strings } : null;
+		});
+		const entries = parseResults.filter(
+			(r): r is { uri: string; contentHash: string; strings: SourceString[] } => r !== null,
+		);
 
 		this.bulkUpsertFiles(entries);
 
@@ -614,6 +627,33 @@ export class SqliteCache {
  * Convert a file:// URI string to a local filesystem path.
  * Returns `undefined` for non-file URIs.
  */
+const DEFAULT_CONCURRENCY = 32;
+
+/**
+ * Run async tasks with a concurrency limit.
+ * Calls `fn` for each item, with at most `concurrency` calls in-flight at once.
+ * Results are returned in input order.
+ */
+async function mapConcurrent<T, R>(
+	items: readonly T[],
+	concurrency: number,
+	fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+	const results = new Array<R>(items.length);
+	let nextIndex = 0;
+
+	async function worker() {
+		while (nextIndex < items.length) {
+			const i = nextIndex++;
+			results[i] = await fn(items[i], i);
+		}
+	}
+
+	const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+	await Promise.all(workers);
+	return results;
+}
+
 export function fileUriToFsPath(uri: string): string | undefined {
 	if (!uri.startsWith("file://")) return undefined;
 	try {
