@@ -83,10 +83,32 @@ function copyTreeSitterRuntime(): void {
 	console.log("Copied web-tree-sitter.wasm → wasm/");
 }
 
+function copySqlJsWasm(): void {
+	const srcPath = resolve(
+		dirname(import.meta.dirname),
+		"node_modules",
+		"sql.js",
+		"dist",
+		"sql-wasm.wasm",
+	);
+
+	if (!existsSync(srcPath)) {
+		console.error("sql-wasm.wasm not found. Is sql.js installed?");
+		process.exit(1);
+	}
+
+	mkdirSync(WASM_DIR, { recursive: true });
+
+	const destPath = join(WASM_DIR, "sql-wasm.wasm");
+	copyFileSync(srcPath, destPath);
+	console.log("Copied sql-wasm.wasm → wasm/");
+}
+
 const args = process.argv.slice(2);
 const languages = args.length > 0 ? args : Object.keys(LANGUAGE_MAP);
 
 copyTreeSitterRuntime();
+copySqlJsWasm();
 
 for (const lang of languages) {
 	copyWasm(lang);

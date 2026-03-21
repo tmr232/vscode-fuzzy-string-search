@@ -1,6 +1,6 @@
 import { join, relative } from "node:path";
 import * as vscode from "vscode";
-import type { StringCache } from "../cache/string-cache.js";
+import type { SqliteCache } from "../cache/sqlite-cache.js";
 import { countFilesByLanguage } from "../files/file-discovery.js";
 import { getAllLanguages } from "../languages/registry.js";
 import {
@@ -8,7 +8,7 @@ import {
 	findAlignment,
 	formatAlignedMatch,
 } from "../matching/alignment.js";
-import type { MatchResult } from "../matching/fuzzy-matcher.js";
+import type { SearchMatch } from "../search/search-engine.js";
 import { search } from "../search/search-engine.js";
 
 export const VIEW_ID = "fuzzyStringSearch.searchPanel";
@@ -56,7 +56,7 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
-		private readonly cache: StringCache,
+		private readonly cache: SqliteCache,
 		private readonly workspaceState: vscode.Memento,
 		private readonly outputChannel: vscode.OutputChannel,
 		private readonly onSearchComplete?: () => void,
@@ -158,7 +158,11 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			}
 		}
 
-		search(query, this.cache, wasmDir, {
+		const workspaceFolderUris = (vscode.workspace.workspaceFolders ?? []).map((f) =>
+			f.uri.toString(),
+		);
+
+		search(query, this.cache, wasmDir, workspaceFolderUris, {
 			scoreCutoff: message.scoreCutoff,
 			minLengthRatio: message.minLengthRatio,
 			maxResults,
@@ -168,11 +172,6 @@ export class SearchPanelProvider implements vscode.WebviewViewProvider {
 			token,
 			fileUris,
 			logger: this.outputChannel,
-			onProgress: (parsed, total) => {
-				if (!token.isCancellationRequested) {
-					this.postMessage({ type: "progress", parsed, total });
-				}
-			},
 		})
 			.then(({ results: allResults, timings, parseFailures }) => {
 				if (token.isCancellationRequested) return;
@@ -222,31 +221,34 @@ interface FormattedResult {
 	endColumn: number;
 }
 
+function deriveRangeFromSegments(segments: import("../types.js").ContentSegment[]) {
+	const first = segments[0];
+	const last = segments[segments.length - 1];
+	if (!first || !last) {
+		return { startLine: 0, startColumn: 0, endLine: 0, endColumn: 0 };
+	}
+	return {
+		startLine: first.startLine,
+		startColumn: first.startColumn,
+		endLine: last.endLine,
+		endColumn: last.endColumn,
+	};
+}
+
 function formatResults(
-	results: MatchResult[],
+	results: SearchMatch[],
 	workspaceRoot: string | undefined,
 	query: string,
 ): FormattedResult[] {
 	return results.map((r) => {
-		const { sourceString } = r;
-		const alignment = findAlignment(query, sourceString.content);
+		const alignment = findAlignment(query, r.content);
+		const range = deriveRangeFromSegments(r.segments);
 
-		let startLine = sourceString.startLine;
-		let startColumn = sourceString.startColumn;
-		let endLine = sourceString.endLine;
-		let endColumn = sourceString.endColumn;
+		let { startLine, startColumn, endLine, endColumn } = range;
 
-		if (alignment && sourceString.segments.length > 0) {
-			const startPos = contentOffsetToPosition(
-				alignment.start,
-				sourceString.segments,
-				sourceString.content,
-			);
-			const endPos = contentOffsetToPosition(
-				alignment.end,
-				sourceString.segments,
-				sourceString.content,
-			);
+		if (alignment && r.segments.length > 0) {
+			const startPos = contentOffsetToPosition(alignment.start, r.segments, r.content);
+			const endPos = contentOffsetToPosition(alignment.end, r.segments, r.content);
 			if (startPos) {
 				startLine = startPos.line;
 				startColumn = startPos.column;
@@ -258,11 +260,9 @@ function formatResults(
 		}
 
 		return {
-			filePath: sourceString.filePath,
-			relativePath: workspaceRoot
-				? relative(workspaceRoot, sourceString.filePath)
-				: sourceString.filePath,
-			content: formatAlignedMatch(sourceString.content, query),
+			filePath: r.filePath,
+			relativePath: workspaceRoot ? relative(workspaceRoot, r.filePath) : r.filePath,
+			content: formatAlignedMatch(r.content, query),
 			score: r.score,
 			startLine,
 			startColumn,

@@ -6,6 +6,10 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 
 ### Changed
 
+- **Replaced JSON persistent cache with SQLite-based tiered cache (ADR-007):** the single JSON cache file is replaced by a SQLite database (via sql.js/WASM) with three tables — `files` (URI + hash), `strings` (deduplicated content), and `locations` (segments per file). This dramatically reduces disk size, enables incremental updates per file, and loads only string content into memory for matching (locations are queried on demand for matched results only).
+- **Lazy cache lifecycle:** the extension no longer loads the persistent cache on activation. The SQLite database is opened and validated on the first search, reducing activation time to near-zero.
+- **Fuzzy matcher operates on plain strings:** `fuzzyMatch` now accepts `string[]` instead of `SourceString[]`, returning `ScoredContentMatch[]` (`{ content, score }`). Location data is resolved only for the ~100 matched strings, not loaded for all candidates.
+- **Search results use `SearchMatch` type:** results now carry `{ content, filePath, segments, score }` with `startLine`/`endLine` derived from segments at display time, rather than storing redundant top-level position fields.
 - Output channel logs now show a detailed parsing timing breakdown: tree-sitter parsing time vs. string collection time (cumulative across files), in addition to the existing overall collection time
 - Persistent cache is now saved eagerly after the first search and periodically (every 10 minutes) when modified, instead of only at deactivation — this prevents cache loss if VS Code crashes or the extension host is killed
 - Persistent cache writes are now atomic (write-to-temp + rename) to prevent corruption from crashes mid-write
@@ -21,6 +25,7 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 
 ### Added
 
+- New dependency: `sql.js` (SQLite compiled to WASM, ~1 MB) — consistent with the project's existing WASM approach for tree-sitter
 - TypeScript/TSX language support: single/double-quoted strings and template literals (interpolation → `{}`), escape sequences — via the `tree-sitter-typescript` grammar
 - JavaScript/JSX language support: same string handling as TypeScript, using the TypeScript grammar (which is a superset)
 - Language selector in the search panel: collapsible "⋯ languages" section with per-language checkboxes to control which languages are searched; selection is persisted per workspace via `workspaceState`

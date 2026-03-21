@@ -2,14 +2,14 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type * as vscode from "vscode";
-import type { StringCache } from "../cache/string-cache.js";
+import type { SqliteCache } from "../cache/sqlite-cache.js";
+import { fileUriToFsPath } from "../cache/sqlite-cache.js";
 import { discoverFiles } from "../files/file-discovery.js";
 import { getLanguageForFile } from "../languages/registry.js";
-import type { MatchResult } from "../matching/fuzzy-matcher.js";
 import { fuzzyMatch } from "../matching/fuzzy-matcher.js";
 import { createParser, initTreeSitter, loadLanguage } from "../parsing/parser-manager.js";
 import { collectStrings } from "../parsing/string-collector.js";
-import type { SourceString } from "../types.js";
+import type { ContentSegment, SourceString } from "../types.js";
 
 /**
  * Timing information for a search operation (wall-clock seconds).
@@ -17,7 +17,7 @@ import type { SourceString } from "../types.js";
 export interface SearchTimings {
 	/** Seconds spent discovering files. */
 	discoverySec: number;
-	/** Seconds spent collecting strings (parsing). */
+	/** Seconds spent collecting strings (parsing + cache sync). */
 	collectSec: number;
 	/** Seconds spent fuzzy matching. */
 	matchSec: number;
@@ -64,10 +64,20 @@ export interface SearchOptions {
 export type ParseFailures = Record<string, number>;
 
 /**
+ * A search result with location information, ready for the UI.
+ */
+export interface SearchMatch {
+	content: string;
+	filePath: string;
+	segments: ContentSegment[];
+	score: number;
+}
+
+/**
  * Result of a search operation, including results and timing information.
  */
 export interface SearchResult {
-	results: MatchResult[];
+	results: SearchMatch[];
 	timings: SearchTimings;
 	/** Number of files that failed to read or parse, keyed by language ID. */
 	parseFailures: ParseFailures;
@@ -75,103 +85,70 @@ export interface SearchResult {
 
 const DEFAULT_SCORE_CUTOFF = 60;
 const DEFAULT_MAX_RESULTS = 100;
-const CONCURRENCY_LIMIT = 8;
-
-interface FileParseResult {
-	strings?: SourceString[];
-	/** Set to the language ID when the file failed to read or parse. */
-	failedLanguageId?: string;
-	/** Milliseconds spent in tree-sitter parsing (only set for freshly parsed files). */
-	parseMs?: number;
-	/** Milliseconds spent collecting strings from AST (only set for freshly parsed files). */
-	collectMs?: number;
-}
 
 /**
- * Parse a single file and return its source strings, using the cache when available.
- *
- * Returns `undefined` strings if the file's language is unsupported or filtered out.
- * Sets `failedLanguageId` when the file could be identified but failed to read or parse.
+ * Create a file parser function for the SqliteCache.
+ * This reads a file, parses it with tree-sitter, and returns SourceStrings + hash.
  */
-async function getStringsForFile(
-	uri: vscode.Uri,
-	cache: StringCache,
+function makeFileParser(
 	wasmDir: string,
-	enabledLanguageIds?: string[],
-	logger?: SearchLogger,
-): Promise<FileParseResult> {
-	const uriString = uri.toString();
-	const cached = cache.get(uriString);
-	if (cached) return { strings: cached };
-
-	const failedLang = cache.getFailed(uriString);
-	if (failedLang) return { failedLanguageId: failedLang };
-
-	const filePath = uri.fsPath;
-	const langSupport = getLanguageForFile(filePath);
-	if (!langSupport) return {};
-	if (enabledLanguageIds && !enabledLanguageIds.includes(langSupport.languageId)) return {};
-
-	const wasmPath = join(wasmDir, langSupport.wasmFileName);
-
-	let source: string;
-	try {
-		source = await readFile(filePath, "utf-8");
-	} catch {
-		cache.setFailed(uriString, langSupport.languageId);
-		return { failedLanguageId: langSupport.languageId };
-	}
-
-	try {
-		const language = await loadLanguage(wasmPath);
-		const parser = createParser(language);
-		const { strings, timings } = collectStrings(source, filePath, parser, langSupport);
-		const contentHash = createHash("sha256").update(source).digest("hex");
-		cache.set(uriString, strings, contentHash);
-		return { strings, parseMs: timings.parseMs, collectMs: timings.collectMs };
-	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
-		logger?.appendLine(`Failed to parse ${filePath}: ${message}`);
-		cache.setFailed(uriString, langSupport.languageId);
-		return { failedLanguageId: langSupport.languageId };
-	}
-}
-
-/**
- * Process a batch of file URIs concurrently with a concurrency limit.
- *
- * Calls `processFn` for each URI and returns when all have finished.
- * If the token is cancelled, stops scheduling new work.
- */
-async function processWithConcurrency(
-	uris: vscode.Uri[],
-	concurrency: number,
-	token: vscode.CancellationToken | undefined,
-	processFn: (uri: vscode.Uri) => Promise<void>,
-): Promise<void> {
-	let index = 0;
-	const workers = Array.from({ length: Math.min(concurrency, uris.length) }, async () => {
-		while (index < uris.length) {
-			if (token?.isCancellationRequested) return;
-			const uri = uris[index++];
-			if (uri) {
-				await processFn(uri);
-			}
+	cache: SqliteCache,
+	enabledLanguageIds: string[] | undefined,
+	logger: SearchLogger | undefined,
+	parseFailures: ParseFailures,
+) {
+	return async (uri: string): Promise<{ strings: SourceString[]; contentHash: string } | null> => {
+		const failedLang = cache.getFailed(uri);
+		if (failedLang) {
+			parseFailures[failedLang] = (parseFailures[failedLang] ?? 0) + 1;
+			return null;
 		}
-	});
-	await Promise.all(workers);
+
+		const fsPath = fileUriToFsPath(uri);
+		if (!fsPath) return null;
+
+		const langSupport = getLanguageForFile(fsPath);
+		if (!langSupport) return null;
+		if (enabledLanguageIds && !enabledLanguageIds.includes(langSupport.languageId)) return null;
+
+		const wasmPath = join(wasmDir, langSupport.wasmFileName);
+
+		let source: string;
+		try {
+			source = await readFile(fsPath, "utf-8");
+		} catch {
+			cache.setFailed(uri, langSupport.languageId);
+			parseFailures[langSupport.languageId] = (parseFailures[langSupport.languageId] ?? 0) + 1;
+			return null;
+		}
+
+		try {
+			const language = await loadLanguage(wasmPath);
+			const parser = createParser(language);
+			const { strings } = collectStrings(source, fsPath, parser, langSupport);
+			const contentHash = createHash("sha256").update(source).digest("hex");
+			return { strings, contentHash };
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			logger?.appendLine(`Failed to parse ${fsPath}: ${message}`);
+			cache.setFailed(uri, langSupport.languageId);
+			parseFailures[langSupport.languageId] = (parseFailures[langSupport.languageId] ?? 0) + 1;
+			return null;
+		}
+	};
 }
 
 /**
  * Search for fuzzy string matches across workspace files.
  *
- * Pipeline: discover files → parse (with cache) → fuzzy match → sort → return.
- * Files are processed concurrently. Results can be streamed via `onFileResults`.
+ * Pipeline: discover files → ensure cache ready → fuzzy match content strings
+ *   → resolve locations for matched IDs → sort → return.
  */
 export async function search(
 	query: string,
-	cache: StringCache,
+	cache: SqliteCache,
 	wasmDir: string,
+	workspaceFolderUris: string[],
 	options?: SearchOptions,
 ): Promise<SearchResult> {
 	const emptyResult: SearchResult = {
@@ -211,66 +188,94 @@ export async function search(
 
 	logger?.appendLine(`Discovery: ${files.length} files found in ${discoverySec.toFixed(2)}s`);
 
-	const allResults: MatchResult[] = [];
-	const allStrings: SourceString[] = [];
 	const parseFailures: ParseFailures = {};
 
-	let parsed = 0;
-	let cachedFiles = 0;
-	let totalParseMs = 0;
-	let totalCollectMs = 0;
-	const onProgress = options?.onProgress;
-	const totalFiles = files.length;
-
+	// Ensure the cache is ready (loads DB, validates, re-parses stale files)
 	const collectStart = performance.now();
-	await processWithConcurrency(files, CONCURRENCY_LIMIT, token, async (uri) => {
-		const wasCached = cache.get(uri.toString()) !== undefined;
-		const { strings, failedLanguageId, parseMs, collectMs } = await getStringsForFile(
-			uri,
-			cache,
-			wasmDir,
-			options?.enabledLanguageIds,
-			logger,
-		);
-		parsed++;
-		if (wasCached) cachedFiles++;
-		if (parseMs !== undefined) totalParseMs += parseMs;
-		if (collectMs !== undefined) totalCollectMs += collectMs;
-		if (failedLanguageId) {
-			parseFailures[failedLanguageId] = (parseFailures[failedLanguageId] ?? 0) + 1;
-		}
-		onProgress?.(parsed, totalFiles);
-		if (!strings || strings.length === 0) return;
-		allStrings.push(...strings);
-	});
+	const allFileUris = files.map((f) => f.toString());
+	const parseFile = makeFileParser(
+		wasmDir,
+		cache,
+		options?.enabledLanguageIds,
+		logger,
+		parseFailures,
+	);
+	await cache.ensureReady(workspaceFolderUris, wasmDir, allFileUris, parseFile);
 	const collectSec = toSec(performance.now() - collectStart);
 
+	if (token?.isCancellationRequested) return emptyResult;
+
+	// Determine which contents to match against
+	const isScoped =
+		options?.fileUris !== undefined ||
+		options?.includeGlob !== undefined ||
+		options?.excludeGlob !== undefined;
+
+	const candidateContents = isScoped
+		? cache.getContentsForFiles(allFileUris)
+		: cache.getAllContents();
+
 	logger?.appendLine(
-		`Collection: ${allStrings.length} strings from ${parsed} files (${cachedFiles} from cache) in ${collectSec.toFixed(2)}s`,
-	);
-	logger?.appendLine(
-		`  Tree-sitter parsing: ${toSec(totalParseMs).toFixed(3)}s, string collection: ${toSec(totalCollectMs).toFixed(3)}s (cumulative across files)`,
+		`Collection: ${candidateContents.length} unique strings, cache sync in ${collectSec.toFixed(2)}s`,
 	);
 
+	// Fuzzy match
 	const matchStart = performance.now();
-	if (allStrings.length > 0) {
-		const fileResults = fuzzyMatch(query, allStrings, {
+	const allMatches: SearchMatch[] = [];
+
+	if (candidateContents.length > 0) {
+		const scoredMatches = fuzzyMatch(query, candidateContents, {
 			cutoff: scoreCutoff,
 			minLengthRatio: options?.minLengthRatio,
 		});
-		allResults.push(...fileResults);
+
+		// Resolve matched content strings to IDs
+		const matchedIds: number[] = [];
+		const scoreByContent = new Map<string, number>();
+		for (const m of scoredMatches) {
+			const id = cache.getIdForContent(m.content);
+			if (id !== undefined) {
+				matchedIds.push(id);
+				scoreByContent.set(m.content, m.score);
+			}
+		}
+
+		// Query locations for matched IDs
+		if (matchedIds.length > 0) {
+			const locations = cache.getLocationsForIds(matchedIds);
+
+			// If scoped, filter locations to only the scoped files
+			const scopeSet = isScoped ? new Set(allFileUris) : undefined;
+
+			for (const loc of locations) {
+				if (scopeSet && !scopeSet.has(loc.fileUri)) continue;
+
+				const fsPath = fileUriToFsPath(loc.fileUri);
+				if (!fsPath) continue;
+
+				const score = scoreByContent.get(loc.content);
+				if (score === undefined) continue;
+
+				allMatches.push({
+					content: loc.content,
+					filePath: fsPath,
+					segments: loc.segments,
+					score,
+				});
+			}
+		}
 	}
 	const matchSec = toSec(performance.now() - matchStart);
 
-	allResults.sort((a, b) => b.score - a.score);
+	allMatches.sort((a, b) => b.score - a.score);
 
 	const results =
-		maxResults > 0 && allResults.length > maxResults ? allResults.slice(0, maxResults) : allResults;
+		maxResults > 0 && allMatches.length > maxResults ? allMatches.slice(0, maxResults) : allMatches;
 
 	const totalSec = toSec(performance.now() - totalStart);
 
 	logger?.appendLine(
-		`Matching: ${allResults.length} matches (returning ${results.length}) in ${matchSec.toFixed(2)}s — total ${totalSec.toFixed(2)}s`,
+		`Matching: ${allMatches.length} matches (returning ${results.length}) in ${matchSec.toFixed(2)}s — total ${totalSec.toFixed(2)}s`,
 	);
 
 	return {

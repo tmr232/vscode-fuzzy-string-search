@@ -1,14 +1,11 @@
 import * as vscode from "vscode";
-import { PersistentCache } from "./cache/persistent-cache.js";
-import { StringCache } from "./cache/string-cache.js";
+import { SqliteCache } from "./cache/sqlite-cache.js";
 import { getAllLanguages } from "./languages/registry.js";
 import { SearchPanelProvider, VIEW_ID } from "./views/search-panel.js";
 
-export const stringCache = new StringCache();
 export const outputChannel = vscode.window.createOutputChannel("Fuzzy String Search");
-let persistentCache: PersistentCache | undefined;
+let sqliteCache: SqliteCache | undefined;
 let saveInterval: ReturnType<typeof setInterval> | undefined;
-let hasPerformedInitialSave = false;
 
 /**
  * Interval (in milliseconds) between periodic cache saves.
@@ -20,15 +17,15 @@ function getWorkspaceFolderUris(): string[] {
 }
 
 /**
- * Save the persistent cache if the in-memory cache has been modified.
+ * Save the SQLite cache if it has unsaved changes.
  */
 async function saveIfDirty(): Promise<void> {
-	if (!persistentCache || !stringCache.dirty) return;
+	if (!sqliteCache?.isDirty) return;
 	const folderUris = getWorkspaceFolderUris();
 	try {
-		await persistentCache.save(stringCache, folderUris);
+		await sqliteCache.save(folderUris);
 	} catch (err) {
-		outputChannel.appendLine(`Failed to save persistent cache: ${err}`);
+		outputChannel.appendLine(`Failed to save SQLite cache: ${err}`);
 	}
 }
 
@@ -38,24 +35,8 @@ export function activate(context: vscode.ExtensionContext): void {
 	const registeredLanguages = getAllLanguages().map((l) => l.languageId);
 	outputChannel.appendLine(`Activating — registered languages: ${registeredLanguages.join(", ")}`);
 
-	// Set up persistent cache
-	persistentCache = new PersistentCache(context.globalStorageUri.fsPath, outputChannel);
-
-	// Load persisted cache in the background (non-blocking)
-	const folderUris = getWorkspaceFolderUris();
-	const loadStart = performance.now();
-	persistentCache
-		.load(stringCache, folderUris)
-		.then(() => {
-			const loadSec = ((performance.now() - loadStart) / 1000).toFixed(2);
-			outputChannel.appendLine(`Persistent cache loaded in ${loadSec}s`);
-		})
-		.catch((err) => {
-			outputChannel.appendLine(`Failed to load persistent cache: ${err}`);
-		});
-
-	// Prune stale cache files in the background
-	persistentCache.pruneStale().catch(() => {});
+	// Create SQLite cache (lazy — no DB work until first search)
+	sqliteCache = new SqliteCache(context.globalStorageUri.fsPath, outputChannel);
 
 	// Periodically save the cache if it has been modified
 	saveInterval = setInterval(() => {
@@ -65,25 +46,22 @@ export function activate(context: vscode.ExtensionContext): void {
 	// Register the search panel webview
 	const searchPanelProvider = new SearchPanelProvider(
 		context.extensionUri,
-		stringCache,
+		sqliteCache,
 		context.workspaceState,
 		outputChannel,
 		() => {
-			if (!hasPerformedInitialSave) {
-				hasPerformedInitialSave = true;
-				saveIfDirty().catch(() => {});
-			}
+			saveIfDirty().catch(() => {});
 		},
 	);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(VIEW_ID, searchPanelProvider),
 	);
 
-	// Invalidate cache when a document is saved (covers both internal edits and external tools that trigger a save)
+	// Invalidate cache when a document is saved
 	context.subscriptions.push(
 		vscode.workspace.onDidSaveTextDocument((document) => {
 			outputChannel.appendLine(`Cache invalidated (save): ${document.uri.fsPath}`);
-			stringCache.invalidate(document.uri.toString());
+			sqliteCache?.markChanged(document.uri.toString());
 		}),
 	);
 
@@ -92,13 +70,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.workspace.onDidDeleteFiles((event) => {
 			for (const uri of event.files) {
 				outputChannel.appendLine(`Cache invalidated (delete): ${uri.fsPath}`);
-				stringCache.invalidate(uri.toString());
+				sqliteCache?.markDeleted(uri.toString());
 			}
 		}),
 	);
 
-	// Watch for external file changes using a FileSystemWatcher.
-	// This covers edits made outside VSCode (e.g. git checkout, other editors).
+	// Watch for external file changes using a FileSystemWatcher
 	const extensions = getAllLanguages().flatMap((lang) =>
 		lang.fileExtensions.map((ext) => ext.replace(/^\./, "")),
 	);
@@ -110,14 +87,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
 		watcher.onDidChange((uri) => {
 			outputChannel.appendLine(`Cache invalidated (external change): ${uri.fsPath}`);
-			stringCache.invalidate(uri.toString());
+			sqliteCache?.markChanged(uri.toString());
 		});
 		watcher.onDidDelete((uri) => {
-			stringCache.invalidate(uri.toString());
+			sqliteCache?.markDeleted(uri.toString());
 		});
 		watcher.onDidCreate((_uri) => {
 			// New files don't have a cache entry; nothing to invalidate.
-			// The search engine will parse them on next search.
+			// The search engine will pick them up on next search.
 		});
 
 		context.subscriptions.push(watcher);
@@ -131,5 +108,6 @@ export function deactivate(): void {
 	}
 	// Best-effort save — VS Code allows a short grace period for deactivation
 	saveIfDirty().catch(() => {});
-	stringCache.clear();
+	sqliteCache?.dispose();
+	sqliteCache = undefined;
 }

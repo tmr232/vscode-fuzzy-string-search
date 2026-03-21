@@ -79,6 +79,7 @@
 	},
 	"dependencies": {
 		"fuzzball": "^2.2.3",
+		"sql.js": "^1.14.1",
 		"tree-sitter-cpp": "^0.23.4",
 		"tree-sitter-python": "^0.25.0",
 		"tree-sitter-typescript": "^0.23.2",
