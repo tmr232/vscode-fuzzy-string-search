@@ -4,6 +4,53 @@ import { join } from "node:path";
 import initSqlJs, { type Database } from "sql.js";
 import type { ContentSegment, SourceString } from "../types.js";
 
+/**
+ * Minimum string content length to cache.
+ * Strings shorter than this are skipped — they produce too many false-positive
+ * fuzzy matches and inflate the locations table.
+ */
+const MIN_STRING_LENGTH = 3;
+
+/**
+ * Encode an array of ContentSegments into a compact binary buffer.
+ * Layout: 5 × uint32 per segment (little-endian) = 20 bytes each.
+ *   [contentLength, startLine, startColumn, endLine, endColumn]
+ */
+function encodeSegments(segments: ContentSegment[]): Uint8Array {
+	const buf = new ArrayBuffer(segments.length * 20);
+	const view = new DataView(buf);
+	for (let i = 0; i < segments.length; i++) {
+		const off = i * 20;
+		const s = segments[i];
+		view.setUint32(off, s.contentLength, true);
+		view.setUint32(off + 4, s.startLine, true);
+		view.setUint32(off + 8, s.startColumn, true);
+		view.setUint32(off + 12, s.endLine, true);
+		view.setUint32(off + 16, s.endColumn, true);
+	}
+	return new Uint8Array(buf);
+}
+
+/**
+ * Decode a binary buffer back into ContentSegment[].
+ */
+function decodeSegments(data: Uint8Array): ContentSegment[] {
+	const count = data.byteLength / 20;
+	const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+	const result: ContentSegment[] = Array.from<ContentSegment>({ length: count });
+	for (let i = 0; i < count; i++) {
+		const off = i * 20;
+		result[i] = {
+			contentLength: view.getUint32(off, true),
+			startLine: view.getUint32(off + 4, true),
+			startColumn: view.getUint32(off + 8, true),
+			endLine: view.getUint32(off + 12, true),
+			endColumn: view.getUint32(off + 16, true),
+		};
+	}
+	return result;
+}
+
 export interface CacheLogger {
 	appendLine(message: string): void;
 }
@@ -11,7 +58,7 @@ export interface CacheLogger {
 /**
  * Current schema version. Bump on breaking changes to force a full re-create.
  */
-const CACHE_SCHEMA_VERSION = 2;
+const CACHE_SCHEMA_VERSION = 3;
 
 /**
  * A location row returned when querying matched string IDs.
@@ -120,11 +167,10 @@ export class SqliteCache {
 	setFailed(uri: string, languageId: string, contentHash?: string): void {
 		this.failedUris.set(uri, languageId);
 		if (this.db && contentHash) {
-			this.db.run("INSERT OR REPLACE INTO files (uri, hash, failed_lang) VALUES (?, ?, ?)", [
-				uri,
-				contentHash,
-				languageId,
-			]);
+			this.db.run(
+				"INSERT INTO files (uri, hash, failed_lang) VALUES (?, ?, ?) ON CONFLICT(uri) DO UPDATE SET hash = excluded.hash, failed_lang = excluded.failed_lang",
+				[uri, contentHash, languageId],
+			);
 			this.dirty = true;
 		}
 	}
@@ -159,7 +205,7 @@ export class SqliteCache {
 		const contents: string[] = [];
 		const seen = new Set<string>();
 		const stmt = this.db.prepare(
-			"SELECT DISTINCT s.content FROM locations l JOIN strings s ON l.string_id = s.id WHERE l.file_uri = ?",
+			"SELECT DISTINCT s.content FROM locations l JOIN strings s ON l.string_id = s.id JOIN files f ON l.file_id = f.id WHERE f.uri = ?",
 		);
 
 		for (const uri of fileUris) {
@@ -191,9 +237,10 @@ export class SqliteCache {
 			const chunk = ids.slice(i, i + CHUNK_SIZE);
 			const placeholders = chunk.map(() => "?").join(",");
 			const stmt = this.db.prepare(
-				`SELECT l.string_id, s.content, l.file_uri, l.segments
+				`SELECT l.string_id, s.content, f.uri, l.segments
 				 FROM locations l
 				 JOIN strings s ON l.string_id = s.id
+				 JOIN files f ON l.file_id = f.id
 				 WHERE l.string_id IN (${placeholders})`,
 			);
 			stmt.bind(chunk);
@@ -203,7 +250,7 @@ export class SqliteCache {
 					stringId: row[0] as number,
 					content: row[1] as string,
 					fileUri: row[2] as string,
-					segments: JSON.parse(row[3] as string) as ContentSegment[],
+					segments: decodeSegments(row[3] as Uint8Array),
 				});
 			}
 			stmt.free();
@@ -315,7 +362,8 @@ export class SqliteCache {
 	private createSchema(db: Database): void {
 		db.run(`
 			CREATE TABLE files (
-				uri         TEXT PRIMARY KEY,
+				id          INTEGER PRIMARY KEY,
+				uri         TEXT NOT NULL UNIQUE,
 				hash        TEXT NOT NULL,
 				failed_lang TEXT
 			);
@@ -327,12 +375,12 @@ export class SqliteCache {
 
 			CREATE TABLE locations (
 				string_id  INTEGER NOT NULL REFERENCES strings(id),
-				file_uri   TEXT NOT NULL REFERENCES files(uri) ON DELETE CASCADE,
-				segments   TEXT NOT NULL
+				file_id    INTEGER NOT NULL REFERENCES files(id),
+				segments   BLOB NOT NULL
 			);
 
 			CREATE INDEX idx_locations_string_id ON locations(string_id);
-			CREATE INDEX idx_locations_file_uri ON locations(file_uri);
+			CREATE INDEX idx_locations_file_id ON locations(file_id);
 
 			PRAGMA user_version = ${CACHE_SCHEMA_VERSION};
 		`);
@@ -534,25 +582,33 @@ export class SqliteCache {
 		this.db.run("BEGIN TRANSACTION");
 		try {
 			const upsertFileStmt = this.db.prepare(
-				"INSERT OR REPLACE INTO files (uri, hash, failed_lang) VALUES (?, ?, NULL)",
+				"INSERT INTO files (uri, hash, failed_lang) VALUES (?, ?, NULL) ON CONFLICT(uri) DO UPDATE SET hash = excluded.hash, failed_lang = NULL",
 			);
-			const deleteLocsStmt = this.db.prepare("DELETE FROM locations WHERE file_uri = ?");
+			const getFileIdStmt = this.db.prepare("SELECT id FROM files WHERE uri = ?");
+			const deleteLocsStmt = this.db.prepare("DELETE FROM locations WHERE file_id = ?");
 			const insertStringStmt = this.db.prepare(
 				"INSERT OR IGNORE INTO strings (content) VALUES (?)",
 			);
 			const getStringIdStmt = this.db.prepare("SELECT id FROM strings WHERE content = ?");
 			const insertLocationStmt = this.db.prepare(
-				"INSERT INTO locations (string_id, file_uri, segments) VALUES (?, ?, ?)",
+				"INSERT INTO locations (string_id, file_id, segments) VALUES (?, ?, ?)",
 			);
 
 			for (const entry of entries) {
 				upsertFileStmt.run([entry.uri, entry.contentHash]);
 				upsertFileStmt.reset();
 
-				deleteLocsStmt.run([entry.uri]);
+				getFileIdStmt.bind([entry.uri]);
+				getFileIdStmt.step();
+				const fileId = getFileIdStmt.get()[0] as number;
+				getFileIdStmt.reset();
+
+				deleteLocsStmt.run([fileId]);
 				deleteLocsStmt.reset();
 
 				for (const str of entry.strings) {
+					if (str.content.trim().length < MIN_STRING_LENGTH) continue;
+
 					insertStringStmt.run([str.content]);
 					insertStringStmt.reset();
 
@@ -561,12 +617,13 @@ export class SqliteCache {
 					const stringId = getStringIdStmt.get()[0] as number;
 					getStringIdStmt.reset();
 
-					insertLocationStmt.run([stringId, entry.uri, JSON.stringify(str.segments)]);
+					insertLocationStmt.run([stringId, fileId, encodeSegments(str.segments)]);
 					insertLocationStmt.reset();
 				}
 			}
 
 			upsertFileStmt.free();
+			getFileIdStmt.free();
 			deleteLocsStmt.free();
 			insertStringStmt.free();
 			getStringIdStmt.free();
@@ -588,10 +645,26 @@ export class SqliteCache {
 
 		this.db.run("BEGIN TRANSACTION");
 		try {
+			const getFileIdStmt = this.db.prepare("SELECT id FROM files WHERE uri = ?");
+			const deleteLocsStmt = this.db.prepare("DELETE FROM locations WHERE file_id = ?");
+			const deleteFileStmt = this.db.prepare("DELETE FROM files WHERE id = ?");
+
 			for (const uri of uris) {
-				this.db.run("DELETE FROM locations WHERE file_uri = ?", [uri]);
-				this.db.run("DELETE FROM files WHERE uri = ?", [uri]);
+				getFileIdStmt.bind([uri]);
+				if (getFileIdStmt.step()) {
+					const fileId = getFileIdStmt.get()[0] as number;
+					deleteLocsStmt.run([fileId]);
+					deleteLocsStmt.reset();
+					deleteFileStmt.run([fileId]);
+					deleteFileStmt.reset();
+				}
+				getFileIdStmt.reset();
 			}
+
+			getFileIdStmt.free();
+			deleteLocsStmt.free();
+			deleteFileStmt.free();
+
 			this.db.run("COMMIT");
 			this.dirty = true;
 		} catch (err) {
