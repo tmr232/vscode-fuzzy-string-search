@@ -212,11 +212,15 @@ export async function search(
 
 	if (token?.isCancellationRequested) return emptyResult;
 
-	// Determine which contents to match against
+	// Determine which contents to match against.
+	// When enabledLanguageIds is set, the discovered file list is already
+	// language-filtered, so we must scope to those files rather than
+	// returning all cached strings (which span every language).
 	const isScoped =
 		options?.fileUris !== undefined ||
 		options?.includeGlob !== undefined ||
-		options?.excludeGlob !== undefined;
+		options?.excludeGlob !== undefined ||
+		options?.enabledLanguageIds !== undefined;
 
 	const candidateContents = isScoped
 		? cache.getContentsForFiles(allFileUris)
