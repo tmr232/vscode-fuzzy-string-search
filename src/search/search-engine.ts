@@ -201,13 +201,7 @@ export async function search(
 		logger,
 		parseFailures,
 	);
-	await cache.ensureReady(
-		workspaceFolderUris,
-		wasmDir,
-		allFileUris,
-		parseFile,
-		options?.onProgress,
-	);
+	await cache.ensureReady(workspaceFolderUris, allFileUris, parseFile, options?.onProgress);
 	const collectSec = toSec(performance.now() - collectStart);
 
 	if (token?.isCancellationRequested) return emptyResult;

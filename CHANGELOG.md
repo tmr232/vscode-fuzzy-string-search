@@ -6,6 +6,7 @@ All notable changes to the "Fuzzy String Search" extension will be documented in
 
 ### Changed
 
+- **Centralized sql.js WASM initialization:** sql.js is now initialized once via a shared `sql-init` module (like tree-sitter), removing the per-`ensureReady` `wasmDir` parameter. The extension calls `initSqlJs(wasmDir)` at activation; tests call `initSqlJs()` without a path (sql.js self-resolves).
 - **Replaced JSON persistent cache with SQLite-based tiered cache (ADR-007):** the single JSON cache file is replaced by a SQLite database (via sql.js/WASM) with three tables — `files` (URI + hash), `strings` (deduplicated content), and `locations` (segments per file). This dramatically reduces disk size, enables incremental updates per file, and loads only string content into memory for matching (locations are queried on demand for matched results only).
 - **Lazy cache lifecycle:** the extension no longer loads the persistent cache on activation. The SQLite database is opened and validated on the first search, reducing activation time to near-zero.
 - **Fuzzy matcher operates on plain strings:** `fuzzyMatch` now accepts `string[]` instead of `SourceString[]`, returning `ScoredContentMatch[]` (`{ content, score }`). Location data is resolved only for the ~100 matched strings, not loaded for all candidates.

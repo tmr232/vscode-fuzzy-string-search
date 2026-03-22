@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import * as vscode from "vscode";
+import { initSqlJs } from "./cache/sql-init.js";
 import { SqliteCache } from "./cache/sqlite-cache.js";
 import { getAllLanguages } from "./languages/registry.js";
 import { SearchPanelProvider, VIEW_ID } from "./views/search-panel.js";
@@ -34,6 +36,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	const registeredLanguages = getAllLanguages().map((l) => l.languageId);
 	outputChannel.appendLine(`Activating — registered languages: ${registeredLanguages.join(", ")}`);
+
+	// Initialize sql.js WASM runtime (once, before any DB work)
+	const wasmDir = join(context.extensionUri.fsPath, "wasm");
+	initSqlJs(wasmDir);
 
 	// Create SQLite cache (lazy — no DB work until first search)
 	sqliteCache = new SqliteCache(context.globalStorageUri.fsPath, outputChannel);

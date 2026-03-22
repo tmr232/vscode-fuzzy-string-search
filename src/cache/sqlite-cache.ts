@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import initSqlJs, { type Database } from "sql.js";
+import type { Database } from "sql.js";
 import type { ContentSegment, SourceString } from "../types.js";
+import { getSqlJs } from "./sql-init.js";
 
 /**
  * Minimum string content length to cache.
@@ -122,7 +123,6 @@ export class SqliteCache {
 	 */
 	async ensureReady(
 		workspaceFolderUris: string[],
-		wasmDir: string,
 		allFileUris: string[],
 		parseFile: (uri: string) => Promise<{
 			strings: SourceString[];
@@ -131,7 +131,7 @@ export class SqliteCache {
 		onProgress?: (parsed: number, total: number) => void,
 	): Promise<void> {
 		if (!this.ready) {
-			await this.initDb(workspaceFolderUris, wasmDir);
+			await this.initDb(workspaceFolderUris);
 			await this.validateAndSync(allFileUris, parseFile, onProgress);
 			this.ready = true;
 			return;
@@ -321,11 +321,11 @@ export class SqliteCache {
 
 	// --- Private methods ---
 
-	private async initDb(workspaceFolderUris: string[], wasmDir: string): Promise<void> {
+	private async initDb(workspaceFolderUris: string[]): Promise<void> {
 		const filePath = this.dbFilePath(workspaceFolderUris);
 		this.logger?.appendLine(`SQLite cache path: ${filePath}`);
 
-		const SQL = await initSqlJs({ locateFile: (file: string) => join(wasmDir, file) });
+		const SQL = await getSqlJs();
 
 		// Try to load existing DB from disk
 		let db: Database;

@@ -1,7 +1,8 @@
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { initSqlJs } from "../../src/cache/sql-init.js";
 import { SqliteCache } from "../../src/cache/sqlite-cache.js";
 
 import { resetParserManager } from "../../src/parsing/parser-manager.js";
@@ -36,6 +37,10 @@ const discoverFilesMock = vi.mocked(discoverFiles);
 describe("search", () => {
 	let cache: SqliteCache;
 	let storageDir: string;
+
+	beforeAll(async () => {
+		await initSqlJs();
+	});
 
 	beforeEach(async () => {
 		storageDir = resolve(

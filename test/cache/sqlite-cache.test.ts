@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { initSqlJs } from "../../src/cache/sql-init.js";
 import { SqliteCache } from "../../src/cache/sqlite-cache.js";
 import type { SourceString } from "../../src/types.js";
 
@@ -34,6 +35,10 @@ describe("SqliteCache", () => {
 	let storageDir: string;
 	let fixtureDir: string;
 	const workspaceUris = ["file:///workspace/project"];
+
+	beforeAll(async () => {
+		await initSqlJs();
+	});
 
 	beforeEach(async () => {
 		const base = join(
@@ -399,8 +404,8 @@ describe("SqliteCache", () => {
 
 		// Corrupt the schema version by opening the DB and changing PRAGMA user_version
 		// We'll do this by loading the saved DB, changing it, and saving it back
-		const initSqlJs = (await import("sql.js")).default;
-		const SQL = await initSqlJs();
+		const { getSqlJs } = await import("../../src/cache/sql-init.js");
+		const SQL = await getSqlJs();
 		const { readFile: rf } = await import("node:fs/promises");
 		const { readdirSync } = await import("node:fs");
 		const cacheDir = join(storageDir, "cache");
